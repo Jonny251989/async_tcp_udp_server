@@ -11,65 +11,33 @@
 #include <unistd.h>
 #include <signal.h>
 #include <filesystem>
+#include <cstdlib> // для getenv
+#include <netdb.h> // для getaddrinfo
+#include <cstring> // для memset
 
 class FunctionalTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Получаем абсолютный путь к серверу
-        char cwd[1024];
-        if (getcwd(cwd, sizeof(cwd)) == nullptr) {
-            FAIL() << "getcwd() error";
-        }
-        std::string server_path = std::string(cwd) + "/build/telemetry_server";
+        // Получаем хост и порт из переменных окружения
+        const char* env_host = std::getenv("SERVER_HOST");
+        const char* env_port = std::getenv("SERVER_PORT");
         
-        std::cout << "Starting server from: " << server_path << std::endl;
+        server_host_ = env_host ? env_host : "127.0.0.1";
+        server_port_ = env_port ? std::atoi(env_port) : 8080;
         
-        // Пробуем разные порты если 8080 занят
-        for (int port = 8080; port <= 8090; ++port) {
-            if (start_server(port)) {
-                server_port_ = port;
-                std::cout << "Server started on port " << port << std::endl;
-                return;
-            }
-        }
-        FAIL() << "Could not start server on any port between 8080-8090";
+        std::cout << "Testing against server: " << server_host_ << ":" << server_port_ << std::endl;
+        
+        // Ждем пока сервер станет доступен
+        wait_for_server(server_host_, server_port_, 30);
     }
 
     void TearDown() override {
-        // Останавливаем сервер
-        if (server_pid > 0) {
-            kill(server_pid, SIGTERM);
-            waitpid(server_pid, nullptr, 0);
-            std::cout << "Server stopped" << std::endl;
-        }
+        // В Docker окружении не останавливаем сервер, так как он запущен отдельно
     }
 
-    bool start_server(uint16_t port) {
-        char cwd[1024];
-        if (getcwd(cwd, sizeof(cwd)) == nullptr) {
-            return false;
-        }
-        std::string server_path = std::string(cwd) + "/build/telemetry_server";
+    void wait_for_server(const std::string& host, uint16_t port, int max_attempts) {
+        std::cout << "Waiting for server to start on " << host << ":" << port << "..." << std::endl;
         
-        // Запускаем сервер в фоне
-        server_pid = fork();
-        if (server_pid == 0) {
-            // Дочерний процесс - запускаем сервер
-            if (chdir(cwd) != 0) {
-                perror("chdir");
-                exit(1);
-            }
-            execl(server_path.c_str(), "telemetry_server", std::to_string(port).c_str(), nullptr);
-            perror("execl failed");
-            exit(1);
-        }
-        
-        // Ждем, пока сервер запустится
-        return wait_for_server(port, 10);
-    }
-
-    bool wait_for_server(uint16_t port, int max_attempts) {
-        std::cout << "Waiting for server to start on port " << port << "..." << std::endl;
         for (int i = 0; i < max_attempts; ++i) {
             int sock = socket(AF_INET, SOCK_STREAM, 0);
             if (sock < 0) {
@@ -77,26 +45,38 @@ protected:
                 continue;
             }
 
-            sockaddr_in serv_addr{};
-            serv_addr.sin_family = AF_INET;
-            serv_addr.sin_port = htons(port);
-            serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+            // Используем getaddrinfo для разрешения DNS имен (работает с Docker именами)
+            struct addrinfo hints, *result;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            
+            char port_str[6];
+            snprintf(port_str, sizeof(port_str), "%d", port);
+            
+            int status = getaddrinfo(host.c_str(), port_str, &hints, &result);
+            if (status != 0) {
+                std::cerr << "getaddrinfo failed: " << gai_strerror(status) << std::endl;
+                close(sock);
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                continue;
+            }
 
-            if (connect(sock, (sockaddr*)&serv_addr, sizeof(serv_addr)) == 0) {
+            if (connect(sock, result->ai_addr, result->ai_addrlen) == 0) {
+                freeaddrinfo(result);
                 close(sock);
                 std::cout << "Server is ready after " << (i + 1) << " attempts" << std::endl;
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                return true;
+                return;
             }
+            
+            freeaddrinfo(result);
             close(sock);
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
-        std::cout << "Server not available after " << max_attempts << " attempts" << std::endl;
-        return false;
+        throw std::runtime_error("Server not available after " + std::to_string(max_attempts) + " attempts");
     }
 
     std::string run_client_test(const std::string& test_name) {
-        // Используем прямые вызовы клиентов вместо скрипта
         char cwd[1024];
         if (getcwd(cwd, sizeof(cwd)) == nullptr) {
             return "ERROR: getcwd() error";
@@ -112,15 +92,20 @@ protected:
         }
         
         // Читаем сообщение из файла
-        std::string input_file = std::string(cwd) + "/tests/test_data/" + test_name + "_input.txt";
+        std::string input_file = "/test_data/" + test_name + "_input.txt";
         std::ifstream file(input_file);
         if (!file) {
-            return "ERROR: Cannot open input file: " + input_file;
+            input_file = std::string(cwd) + "/tests/test_data/" + test_name + "_input.txt";
+            file.open(input_file);
+            if (!file) {
+                return "ERROR: Cannot open input file: " + input_file;
+            }
         }
         std::getline(file, message);
         
         // Запускаем клиент и захватываем вывод
-        std::string command = client_path + " 127.0.0.1 " + std::to_string(server_port_) + " \"" + message + "\"";
+        std::string command = client_path + " " + server_host_ + " " + 
+                             std::to_string(server_port_) + " \"" + message + "\"";
         
         std::cout << "Running command: " << command << std::endl;
         
@@ -148,16 +133,16 @@ protected:
     }
 
 private:
-    pid_t server_pid = -1;
+    std::string server_host_ = "127.0.0.1";
     uint16_t server_port_ = 8080;
 };
 
+// Тесты остаются без изменений
 TEST_F(FunctionalTest, EchoTcp) {
     const std::string output = run_client_test("echo_tcp");
-    // Извлекаем только часть ответа после "Server response: "
     std::string response = output;
     if (output.find("Server response: ") == 0) {
-        response = output.substr(17); // Убираем "Server response: "
+        response = output.substr(17);
     }
     EXPECT_EQ(response, "Hello World") << "Client output: '" << output << "'";
 }
@@ -168,31 +153,20 @@ TEST_F(FunctionalTest, TimeTcp) {
     if (output.find("Server response: ") == 0) {
         response = output.substr(17);
     }
-    
-    // Проверяем формат времени: YYYY-MM-DD HH:MM:SS
-    if (response.find("ERROR") == std::string::npos) {
-        EXPECT_EQ(response.size(), 19) << "Client output: '" << output << "'";
-        EXPECT_EQ(response[4], '-') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[7], '-') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[10], ' ') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[13], ':') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[16], ':') << "Client output: '" << output << "'";
-    } else {
-        FAIL() << "Command failed: " << output;
-    }
+    EXPECT_EQ(response.size(), 19) << "Client output: '" << output << "'";
+    EXPECT_EQ(response[4], '-') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[7], '-') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[10], ' ') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[13], ':') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[16], ':') << "Client output: '" << output << "'";
 }
 
 TEST_F(FunctionalTest, StatsTcp) {
     const std::string output = run_client_test("stats_tcp");
-    // Статистика должна содержать информацию о подключениях
-    if (output.find("ERROR") == std::string::npos) {
-        EXPECT_NE(output.find("Total connections"), std::string::npos) 
-            << "Client output: '" << output << "'";
-        EXPECT_NE(output.find("Current connections"), std::string::npos)
-            << "Client output: '" << output << "'";
-    } else {
-        FAIL() << "Command failed: " << output;
-    }
+    EXPECT_NE(output.find("Total connections"), std::string::npos) 
+        << "Client output: '" << output << "'";
+    EXPECT_NE(output.find("Current connections"), std::string::npos)
+        << "Client output: '" << output << "'";
 }
 
 TEST_F(FunctionalTest, EchoUdp) {
@@ -210,16 +184,10 @@ TEST_F(FunctionalTest, TimeUdp) {
     if (output.find("Server response: ") == 0) {
         response = output.substr(17);
     }
-    
-    // Проверяем формат времени
-    if (response.find("ERROR") == std::string::npos) {
-        EXPECT_EQ(response.size(), 19) << "Client output: '" << output << "'";
-        EXPECT_EQ(response[4], '-') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[7], '-') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[10], ' ') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[13], ':') << "Client output: '" << output << "'";
-        EXPECT_EQ(response[16], ':') << "Client output: '" << output << "'";
-    } else {
-        FAIL() << "Command failed: " << output;
-    }
+    EXPECT_EQ(response.size(), 19) << "Client output: '" << output << "'";
+    EXPECT_EQ(response[4], '-') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[7], '-') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[10], ' ') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[13], ':') << "Client output: '" << output << "'";
+    EXPECT_EQ(response[16], ':') << "Client output: '" << output << "'";
 }

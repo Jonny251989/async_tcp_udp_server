@@ -35,6 +35,8 @@ UNIT_TESTS = $(BUILD_DIR)/unit_tests
 FUNCTIONAL_TESTS = $(BUILD_DIR)/functional_tests
 
 .PHONY: all clean test unit_tests functional_tests quick_test prepare_test_data
+.PHONY: docker-build docker-build-service docker-run-server docker-run-tests docker-clean
+.PHONY: docker-unit-tests docker-functional-tests docker-full-test docker-client
 
 all: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT)
 
@@ -118,3 +120,49 @@ quick_test: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT)
 		echo "Server already stopped"; \
 	fi
 	@echo "Quick test completed"
+
+# Docker targets
+
+# Сборка Docker образа
+docker-build:
+	docker-compose --profile build up builder
+
+# Сборка конкретного сервиса
+docker-build-service:
+	docker-compose build $(service)
+
+# Запуск сервера в Docker
+docker-run-server:
+	docker-compose up telemetry_server
+
+# Запуск всех тестов в Docker
+docker-run-tests:
+	docker-compose --profile test up unit_tests functional_tests quick_test
+
+# Запуск только unit тестов в Docker
+docker-unit-tests:
+	docker-compose --profile test up unit_tests
+
+# Запуск только functional тестов в Docker
+docker-functional-tests:
+	docker-compose --profile test up functional_tests
+
+# Очистка Docker
+docker-clean:
+	docker-compose down -v
+	docker system prune -f
+
+# Полный цикл тестирования в Docker
+docker-full-test: docker-build docker-run-tests
+
+# Интерактивный клиент для тестирования
+docker-client:
+	docker-compose --profile test run --rm telemetry_client /bin/bash
+
+# Остановка сервера
+stop_server:
+	@echo "Stopping running servers..."
+	@-pkill -f "telemetry_server" 2>/dev/null || true
+	@-sudo kill -9 $(shell sudo lsof -ti:8080) 2>/dev/null || true
+	@-sudo kill -9 $(shell sudo lsof -ti:8081) 2>/dev/null || true
+	@echo "Servers stopped"

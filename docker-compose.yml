@@ -1,0 +1,88 @@
+version: '3.8'
+
+networks:
+  async_tcp_udp_net:
+    driver: bridge
+
+services:
+  async_tcp_udp_server:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    working_dir: /workspace
+    command: 
+      - ./build/telemetry_server
+      - "8080"
+    ports:
+      - "8080:8080"
+      - "8080:8080/udp"
+    networks:
+      - async_tcp_udp_net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  async_tcp_udp_client:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    working_dir: /workspace
+    networks:
+      - async_tcp_udp_net
+    command: ["sleep", "infinity"]
+    profiles: ["test"]
+    depends_on:
+      - async_tcp_udp_server
+
+  unit_tests:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    working_dir: /workspace
+    networks:
+      - async_tcp_udp_net
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        ./build/unit_tests
+    profiles: ["test"]
+
+  functional_tests:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    working_dir: /workspace
+    volumes:
+      - ./tests/test_data:/test_data:rw
+    networks:
+      - async_tcp_udp_net
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        SERVER_IP=$$(getent hosts async_tcp_udp_server | awk '{ print $$1 }')
+        echo "Server IP: $$SERVER_IP"
+        
+        until nc -z $$SERVER_IP 8080; do
+          echo "Waiting for server..."
+          sleep 2
+        done
+        
+        echo "Starting functional tests with IP: $$SERVER_IP"
+        SERVER_HOST=$$SERVER_IP ./build/functional_tests
+    environment:
+      - SERVER_PORT=8080
+    profiles: ["test"]
+    depends_on:
+      - async_tcp_udp_server
+
+  quick_test:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    working_dir: /workspace
+    networks:
+      - async_tcp_udp_net
+    command: 
+      - /bin/sh
+      - -c
+      - |
+        # Ждем сервер и запускаем quick test
+        until nc -z async_tcp_udp_server 8080; do sleep 2; done
+        ./build/tcp_client async_tcp_udp_server 8080 "Hello Docker" || echo "Test completed"
+    profiles: ["test"]
+    depends_on:
+      - async_tcp_udp_server

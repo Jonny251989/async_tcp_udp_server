@@ -9,21 +9,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container:
-      image: docker.io/jonnyrembo/async-tcp-udp-server:latest
-      env:
-        SOURCE_DIR: /workspace
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      options: --privileged
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Pull Docker image
+        run: docker pull jonnyrembo/async-tcp-udp-server:latest
+
       - name: Run unit tests
         run: |
-          ./build/unit_tests
+          docker run --rm jonnyrembo/async-tcp-udp-server:latest ./build/unit_tests
 
       - name: Prepare test data
         run: |
@@ -34,26 +30,26 @@ jobs:
           echo "Hello UDP" > tests/test_data/echo_udp_input.txt
           echo "/time" > tests/test_data/time_udp_input.txt
 
-      - name: Start server and run functional tests
+      - name: Run functional tests
         run: |
-          # Запускаем сервер в фоне
-          ./build/telemetry_server 8080 &
-          SERVER_PID=$!
+          # Создаем сеть
+          docker network create test-net
+          
+          # Запускаем сервер
+          docker run -d --name server --network test-net \
+            -p 8080:8080 -p 8080:8080/udp \
+            jonnyrembo/async-tcp-udp-server:latest ./build/telemetry_server 8080
           
           # Ждем запуска сервера
-          sleep 5
+          sleep 10
           
           # Запускаем функциональные тесты
-          ./build/functional_tests
+          docker run --rm --network test-net \
+            -v $(pwd)/tests/test_data:/workspace/tests/test_data:ro \
+            -e SERVER_HOST=server -e SERVER_PORT=8080 \
+            jonnyrembo/async-tcp-udp-server:latest ./build/functional_tests
           
-          # Останавливаем сервер
-          kill $SERVER_PID
-
-      - name: Quick test
-        run: |
-          # Быстрый тест TCP клиента
-          ./build/telemetry_server 8081 &
-          SERVER_PID=$!
-          sleep 3
-          ./build/tcp_client 127.0.0.1 8081 "Test message" || echo "Test completed"
-          kill $SERVER_PID
+          # Очистка
+          docker stop server
+          docker rm server
+          docker network rm test-net

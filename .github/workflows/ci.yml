@@ -26,24 +26,17 @@ jobs:
           docker run --rm \
             -v $(pwd)/tests/test_data:/workspace/tests/test_data:ro \
             jonnyrembo/async-tcp-udp-server:latest /bin/sh -c "
-              # Подготавливаем тестовые данные
-              mkdir -p tests/test_data
-              echo 'Hello World' > tests/test_data/echo_tcp_input.txt
-              echo '/time' > tests/test_data/time_tcp_input.txt
-              echo '/stats' > tests/test_data/stats_tcp_input.txt
-              echo 'Hello UDP' > tests/test_data/echo_udp_input.txt
-              echo '/time' > tests/test_data/time_udp_input.txt
               
-              # Запускаем сервер в фоне
-              ./build/async_tcp_udp_server 8080 &
-              SERVER_PID=\$!
-              
-              # Ждем запуска сервера
-              sleep 5
-              
-              # Запускаем функциональные тесты
-              SERVER_HOST=127.0.0.1 SERVER_PORT=8080 ./build/functional_tests
-              
-              # Останавливаем сервер по имени процесса
-              pkill telemetry_server || true
-            "
+            # Запускаем сервер в фоне
+            ./build/async_tcp_udp_server 8080 &
+            SERVER_PID=\$!
+            
+            # Ждем запуска сервера
+            sleep 5
+            
+            # Запускаем функциональные тесты
+            SERVER_HOST=127.0.0.1 SERVER_PORT=8080 ./build/functional_tests
+            
+            # Останавливаем сервер по имени процесса
+            pkill telemetry_server || true
+          "

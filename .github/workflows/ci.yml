@@ -35,7 +35,7 @@ jobs:
               echo '/time' > tests/test_data/time_udp_input.txt
               
               # Запускаем сервер в фоне
-              ./build/telemetry_server 8080 &
+              ./build/async_tcp_udp_server 8080 &
               SERVER_PID=\$!
               
               # Ждем запуска сервера

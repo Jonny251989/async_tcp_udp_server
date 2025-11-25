@@ -44,7 +44,6 @@ jobs:
               # Запускаем функциональные тесты
               SERVER_HOST=127.0.0.1 SERVER_PORT=8080 ./build/functional_tests
               
-              # Останавливаем сервер
-              kill \$SERVER_PID
-              wait \$SERVER_PID 2>/dev/null
+              # Останавливаем сервер по имени процесса
+              pkill telemetry_server || true
             "

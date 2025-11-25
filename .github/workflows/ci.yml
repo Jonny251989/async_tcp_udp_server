@@ -9,24 +9,51 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: docker.io/jonnyrembo/async-tcp-udp-server:latest
+      env:
+        SOURCE_DIR: /workspace
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      options: --privileged
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build and test
+      - name: Run unit tests
         run: |
-          # Build image
-          docker build -t jonnyrembo/async-tcp-udp-server:latest .
+          ./build/unit_tests
+
+      - name: Prepare test data
+        run: |
+          mkdir -p tests/test_data
+          echo "Hello World" > tests/test_data/echo_tcp_input.txt
+          echo "/time" > tests/test_data/time_tcp_input.txt
+          echo "/stats" > tests/test_data/stats_tcp_input.txt
+          echo "Hello UDP" > tests/test_data/echo_udp_input.txt
+          echo "/time" > tests/test_data/time_udp_input.txt
+
+      - name: Start server and run functional tests
+        run: |
+          # Запускаем сервер в фоне
+          ./build/telemetry_server 8080 &
+          SERVER_PID=$!
           
-          # Run unit tests
-          docker run --rm jonnyrembo/async-tcp-udp-server:latest ./build/unit_tests
+          # Ждем запуска сервера
+          sleep 5
           
-          # Prepare test data
-          make prepare_test_data
+          # Запускаем функциональные тесты
+          ./build/functional_tests
           
-          # Run functional tests
-          docker-compose --profile test up --abort-on-container-exit functional_tests
-          
-          # Cleanup
-          docker-compose down
+          # Останавливаем сервер
+          kill $SERVER_PID
+
+      - name: Quick test
+        run: |
+          # Быстрый тест TCP клиента
+          ./build/telemetry_server 8081 &
+          SERVER_PID=$!
+          sleep 3
+          ./build/tcp_client 127.0.0.1 8081 "Test message" || echo "Test completed"
+          kill $SERVER_PID

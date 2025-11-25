@@ -1,0 +1,32 @@
+name: Async TCP/UDP Server CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v3
+
+      - name: Build and test
+        run: |
+          # Build image
+          docker build -t jonnyrembo/async-tcp-udp-server:latest .
+          
+          # Run unit tests
+          docker run --rm jonnyrembo/async-tcp-udp-server:latest ./build/unit_tests
+          
+          # Prepare test data
+          make prepare_test_data
+          
+          # Run functional tests
+          docker-compose --profile test up --abort-on-container-exit functional_tests

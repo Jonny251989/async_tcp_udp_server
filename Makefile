@@ -26,7 +26,7 @@ COMMON_OBJS = $(patsubst $(COMMON_DIR)/%.cpp,$(BUILD_DIR)/common/%.o,$(COMMON_SO
 SERVER_OBJS = $(patsubst $(SERVER_DIR)/%.cpp,$(BUILD_DIR)/server/%.o,$(SERVER_SOURCES))
 CLIENT_OBJS = $(patsubst $(CLIENT_DIR)/%.cpp,$(BUILD_DIR)/client/%.o,$(CLIENT_SOURCES))
 
-TARGET_SERVER = $(BUILD_DIR)/telemetry_server
+TARGET_SERVER = $(BUILD_DIR)/async_tcp_udp_server
 TARGET_TCP_CLIENT = $(BUILD_DIR)/tcp_client
 TARGET_UDP_CLIENT = $(BUILD_DIR)/udp_client
 

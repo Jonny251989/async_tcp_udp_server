@@ -50,7 +50,7 @@ MESSAGE=$(cat "$INPUT_TO_USE")
 
 # Определяем хост сервера (для Docker используем имя сервиса, для локально - localhost)
 if [ -f "$CLIENT" ]; then
-    SERVER_HOST="telemetry_server"
+    SERVER_HOST="async_tcp_udp_server"
 else
     SERVER_HOST="127.0.0.1"
 fi

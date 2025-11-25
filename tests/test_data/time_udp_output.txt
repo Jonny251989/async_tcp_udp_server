@@ -1,0 +1,2 @@
+Running: /home/ivan/codes/async_tcp_udp_server/build/udp_client 127.0.0.1 8080 "/time"
+Server response: 2025-11-25 00:11:55

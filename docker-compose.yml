@@ -9,7 +9,7 @@ services:
     image: jonnyrembo/async-tcp-udp-server:latest
     working_dir: /workspace
     command: 
-      - ./build/telemetry_server
+      - ./build/async_tcp_udp_server
       - "8080"
     ports:
       - "8080:8080"
@@ -72,17 +72,25 @@ services:
       - async_tcp_udp_server
 
   quick_test:
-    image: jonnyrembo/async-tcp-udp-server:latest
-    working_dir: /workspace
-    networks:
-      - async_tcp_udp_net
-    command: 
-      - /bin/sh
-      - -c
-      - |
-        # Ждем сервер и запускаем quick test
-        until nc -z async_tcp_udp_server 8080; do sleep 2; done
-        ./build/tcp_client async_tcp_udp_server 8080 "Hello Docker" || echo "Test completed"
-    profiles: ["test"]
-    depends_on:
-      - async_tcp_udp_server
+      image: jonnyrembo/async-tcp-udp-server:latest
+      working_dir: /workspace
+      networks:
+        - async_tcp_udp_net
+      command: 
+        - /bin/sh
+        - -c
+        - |
+          # Получаем IP адрес сервера
+          SERVER_IP=$$(getent hosts async_tcp_udp_server | awk '{ print $$1 }')
+          echo "Server IP: $$SERVER_IP"
+          
+          # Ждем сервер и запускаем quick test с IP
+          until nc -z $$SERVER_IP 8080; do sleep 2; done
+          echo "=== Quick Test ==="
+          ./build/tcp_client $$SERVER_IP 8080 "Hello Docker" || echo "TCP test completed"
+          ./build/udp_client $$SERVER_IP 8080 "Hello UDP" || echo "UDP test completed"
+          ./build/tcp_client $$SERVER_IP 8080 "/time" || echo "Time test completed"
+          ./build/tcp_client $$SERVER_IP 8080 "/stats" || echo "Stats test completed"
+      profiles: ["test"]
+      depends_on:
+        - async_tcp_udp_server

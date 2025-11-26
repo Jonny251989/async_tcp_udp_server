@@ -6,6 +6,13 @@
 #include <atomic>
 #include <mutex>
 
+struct ServerStats {
+    size_t total_connections;
+    size_t current_connections;
+    std::chrono::system_clock::time_point start_time;
+};
+
+
 class SessionManager {
 public:
     SessionManager();

@@ -13,12 +13,12 @@ UNIT_TESTS_DIR = $(TESTS_DIR)/unit
 FUNCTIONAL_TESTS_DIR = $(TESTS_DIR)/functional
 TEST_DATA_DIR = $(TESTS_DIR)/test_data
 
-# Source files
-COMMON_SOURCES = $(COMMON_DIR)/protocol.cpp $(COMMON_DIR)/network_utils.cpp
+# Source files - обновленные пути
+COMMON_SOURCES = $(COMMON_DIR)/session_manager.cpp
 SERVER_SOURCES = $(SERVER_DIR)/main.cpp $(SERVER_DIR)/server.cpp \
                  $(SERVER_DIR)/tcp_handler.cpp $(SERVER_DIR)/udp_handler.cpp \
                  $(SERVER_DIR)/tcp_connection.cpp $(SERVER_DIR)/command_processor.cpp \
-                 $(SERVER_DIR)/session_manager.cpp
+                 $(SERVER_DIR)/eventloop.cpp
 CLIENT_SOURCES = $(CLIENT_DIR)/tcp_client.cpp $(CLIENT_DIR)/udp_client.cpp
 
 # Object files
@@ -162,7 +162,7 @@ docker-client:
 # Остановка сервера
 stop_server:
 	@echo "Stopping running servers..."
-	@-pkill -f "telemetry_server" 2>/dev/null || true
+	@-pkill -f "async_tcp_udp_server" 2>/dev/null || true
 	@-sudo kill -9 $(shell sudo lsof -ti:8080) 2>/dev/null || true
 	@-sudo kill -9 $(shell sudo lsof -ti:8081) 2>/dev/null || true
 	@echo "Servers stopped"

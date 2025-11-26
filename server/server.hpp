@@ -1,13 +1,15 @@
 #pragma once
 
-#include "../common/network_utils.hpp"
+#include "network_utils.hpp"
 #include "tcp_handler.hpp"
 #include "udp_handler.hpp"
-#include "session_manager.hpp"
 #include "command_processor.hpp"
+#include "../common/session_manager.hpp"
+#include "command.hpp"
 #include <memory>
 #include <atomic>
 #include <csignal>
+#include <vector>
 
 class Server {
 public:
@@ -19,6 +21,8 @@ public:
     void run();
 
 private:
+    std::vector<std::unique_ptr<Command>> create_commands();
+    
     void setup_tcp_handler();
     void setup_udp_handler();
     void handle_tcp_connection(std::shared_ptr<TcpConnection> connection);

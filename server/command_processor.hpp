@@ -1,29 +1,21 @@
 #pragma once
 
-#include "../common/protocol.hpp"
-
-#include <sstream>
-#include "session_manager.hpp"
-#include <string>
-#include <functional>
+#include "../common/command.hpp"
+#include <vector>
+#include <memory>
 #include <unordered_map>
+#include <string>
 
 class CommandProcessor {
 public:
-    using CommandHandler = std::function<std::string()>;
-    
-    CommandProcessor(SessionManager& stats);
+    explicit CommandProcessor(std::vector<std::unique_ptr<Command>> commands);
     
     std::string process_command(const std::string& command);
-    void register_command(const std::string& name, CommandHandler handler);
 
 private:
-    SessionManager& stats_;
-    std::unordered_map<std::string, CommandHandler> commands_;
-    
-    std::string handle_time();
-    std::string handle_stats();
-    std::string handle_shutdown();
     std::string handle_mirror(const std::string& message);
     bool is_command(const std::string& message);
+
+    std::vector<std::unique_ptr<Command>> commands_;
+    std::unordered_map<std::string, Command*> command_map_;
 };

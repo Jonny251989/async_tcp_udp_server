@@ -1,27 +1,22 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -pthread -O2 -Icommon -Iserver
+CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -Icommon -Iserver
 LDFLAGS = -pthread
-GTEST_FLAGS = -lgtest -lgtest_main -pthread
 
-# Directories
+# Директории
 COMMON_DIR = common
 SERVER_DIR = server
 CLIENT_DIR = client
 BUILD_DIR = build
-TESTS_DIR = tests
-UNIT_TESTS_DIR = $(TESTS_DIR)/unit
-FUNCTIONAL_TESTS_DIR = $(TESTS_DIR)/functional
-TEST_DATA_DIR = $(TESTS_DIR)/test_data
 
-# Source files - обновленные пути
+# Исходные файлы
 COMMON_SOURCES = $(COMMON_DIR)/session_manager.cpp
 SERVER_SOURCES = $(SERVER_DIR)/main.cpp $(SERVER_DIR)/server.cpp \
                  $(SERVER_DIR)/tcp_handler.cpp $(SERVER_DIR)/udp_handler.cpp \
                  $(SERVER_DIR)/tcp_connection.cpp $(SERVER_DIR)/command_processor.cpp \
-                 $(SERVER_DIR)/eventloop.cpp
+                 $(SERVER_DIR)/eventloop.cpp $(SERVER_DIR)/command.cpp
 CLIENT_SOURCES = $(CLIENT_DIR)/tcp_client.cpp $(CLIENT_DIR)/udp_client.cpp
 
-# Object files
+# Объектные файлы
 COMMON_OBJS = $(patsubst $(COMMON_DIR)/%.cpp,$(BUILD_DIR)/common/%.o,$(COMMON_SOURCES))
 SERVER_OBJS = $(patsubst $(SERVER_DIR)/%.cpp,$(BUILD_DIR)/server/%.o,$(SERVER_SOURCES))
 CLIENT_OBJS = $(patsubst $(CLIENT_DIR)/%.cpp,$(BUILD_DIR)/client/%.o,$(CLIENT_SOURCES))
@@ -30,13 +25,7 @@ TARGET_SERVER = $(BUILD_DIR)/async_tcp_udp_server
 TARGET_TCP_CLIENT = $(BUILD_DIR)/tcp_client
 TARGET_UDP_CLIENT = $(BUILD_DIR)/udp_client
 
-# Test targets
-UNIT_TESTS = $(BUILD_DIR)/unit_tests
-FUNCTIONAL_TESTS = $(BUILD_DIR)/functional_tests
-
-.PHONY: all clean test unit_tests functional_tests quick_test prepare_test_data
-.PHONY: docker-build docker-build-service docker-run-server docker-run-tests docker-clean
-.PHONY: docker-unit-tests docker-functional-tests docker-full-test docker-client
+.PHONY: all clean quick_test stop_server
 
 all: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT)
 
@@ -64,40 +53,8 @@ $(BUILD_DIR)/client/%.o: $(CLIENT_DIR)/%.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Unit tests
-$(UNIT_TESTS): $(UNIT_TESTS_DIR)/unit_tests.cpp $(UNIT_TESTS_DIR)/main.cpp $(COMMON_OBJS) $(filter-out $(BUILD_DIR)/server/main.o, $(SERVER_OBJS))
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(GTEST_FLAGS)
-
-# Functional tests
-$(FUNCTIONAL_TESTS): $(FUNCTIONAL_TESTS_DIR)/functional_tests.cpp $(FUNCTIONAL_TESTS_DIR)/main.cpp
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(GTEST_FLAGS)
-
-# Prepare test data
-prepare_test_data:
-	@mkdir -p $(TEST_DATA_DIR)
-	@echo "Hello World" > $(TEST_DATA_DIR)/echo_tcp_input.txt
-	@echo "/time" > $(TEST_DATA_DIR)/time_tcp_input.txt
-	@echo "/stats" > $(TEST_DATA_DIR)/stats_tcp_input.txt
-	@echo "Hello UDP" > $(TEST_DATA_DIR)/echo_udp_input.txt
-	@echo "/time" > $(TEST_DATA_DIR)/time_udp_input.txt
-	@chmod +x $(FUNCTIONAL_TESTS_DIR)/run_functional_test.sh
-
-# Test targets
-unit_tests: $(UNIT_TESTS)
-	@echo "Running unit tests..."
-	./$(UNIT_TESTS)
-
-functional_tests: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT) $(FUNCTIONAL_TESTS) prepare_test_data
-	@echo "Running functional tests..."
-	./$(FUNCTIONAL_TESTS)
-
-test: unit_tests functional_tests
-
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -rf $(TEST_DATA_DIR)
 
 # Быстрый тест сервера
 quick_test: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT)
@@ -121,44 +78,6 @@ quick_test: $(TARGET_SERVER) $(TARGET_TCP_CLIENT) $(TARGET_UDP_CLIENT)
 	fi
 	@echo "Quick test completed"
 
-# Docker targets
-
-# Сборка Docker образа
-docker-build:
-	docker-compose --profile build up builder
-
-# Сборка конкретного сервиса
-docker-build-service:
-	docker-compose build $(service)
-
-# Запуск сервера в Docker
-docker-run-server:
-	docker-compose up telemetry_server
-
-# Запуск всех тестов в Docker
-docker-run-tests:
-	docker-compose --profile test up unit_tests functional_tests quick_test
-
-# Запуск только unit тестов в Docker
-docker-unit-tests:
-	docker-compose --profile test up unit_tests
-
-# Запуск только functional тестов в Docker
-docker-functional-tests:
-	docker-compose --profile test up functional_tests
-
-# Очистка Docker
-docker-clean:
-	docker-compose down -v
-	docker system prune -f
-
-# Полный цикл тестирования в Docker
-docker-full-test: docker-build docker-run-tests
-
-# Интерактивный клиент для тестирования
-docker-client:
-	docker-compose --profile test run --rm telemetry_client /bin/bash
-
 # Остановка сервера
 stop_server:
 	@echo "Stopping running servers..."
@@ -166,3 +85,33 @@ stop_server:
 	@-sudo kill -9 $(shell sudo lsof -ti:8080) 2>/dev/null || true
 	@-sudo kill -9 $(shell sudo lsof -ti:8081) 2>/dev/null || true
 	@echo "Servers stopped"
+
+# Установка (опционально)
+install: $(TARGET_SERVER)
+	install -m 755 $(TARGET_SERVER) /usr/local/bin/async_tcp_udp_server
+
+# Удаление (опционально)
+uninstall:
+	rm -f /usr/local/bin/async_tcp_udp_server
+
+# Отладочная сборка
+debug: CXXFLAGS += -g -DDEBUG
+debug: clean all
+
+# Профилировочная сборка
+profile: CXXFLAGS += -pg
+profile: LDFLAGS += -pg
+profile: clean all
+
+# Помощь
+help:
+	@echo "Доступные цели:"
+	@echo "  all          - сборка всех целей (по умолчанию)"
+	@echo "  clean        - очистка сборки"
+	@echo "  quick_test   - быстрый тест сервера и клиентов"
+	@echo "  stop_server  - остановка всех запущенных серверов"
+	@echo "  debug        - отладочная сборка"
+	@echo "  profile      - профилировочная сборка"
+	@echo "  install      - установка сервера в систему"
+	@echo "  uninstall    - удаление сервера из системы"
+	@echo "  help         - эта справка"

@@ -3,8 +3,10 @@
 #include <string>
 #include <memory>
 #include "../common/session_manager.hpp"
-
-class SessionManager;
+#include <chrono>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 
 // Абстрактный базовый класс для команд
 class Command {

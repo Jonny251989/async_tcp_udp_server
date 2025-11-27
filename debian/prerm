@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+echo "Stopping async-tcp-udp-server service..."
+
+systemctl stop async-tcp-udp-server 2>/dev/null || true
+systemctl disable async-tcp-udp-server 2>/dev/null || true
+
+echo "Service stopped"

@@ -1,0 +1,174 @@
+#pragma once
+
+#include <iostream>
+#include <string>
+#include <cstring>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdexcept>
+
+template <int TYPE>
+class Client {
+public:
+    Client(const std::string& server_ip, uint16_t port);
+    ~Client();
+    
+    void run();
+
+private:
+    void setup_socket();
+    void connect_to_server();
+    void send_message(const std::string& message);
+    std::string receive_response();
+    
+    std::string server_ip_;
+    uint16_t port_;
+    int sock_;
+    sockaddr_in serv_addr_;
+};
+
+// Реализация шаблонного класса
+
+template <int TYPE>
+Client<TYPE>::Client(const std::string& server_ip, uint16_t port) 
+    : server_ip_(server_ip), port_(port), sock_(-1) {
+    
+    setup_socket();
+    connect_to_server();
+}
+
+template <int TYPE>
+Client<TYPE>::~Client() {
+    if (sock_ != -1) {
+        close(sock_);
+    }
+}
+
+template <int TYPE>
+void Client<TYPE>::setup_socket() {
+    sock_ = socket(AF_INET, TYPE, 0);
+    if (sock_ < 0) {
+        throw std::runtime_error("Socket creation failed");
+    }
+    
+    std::memset(&serv_addr_, 0, sizeof(serv_addr_));
+    serv_addr_.sin_family = AF_INET;
+    serv_addr_.sin_port = htons(port_);
+    
+    if (inet_pton(AF_INET, server_ip_.c_str(), &serv_addr_.sin_addr) <= 0) {
+        close(sock_);
+        throw std::runtime_error("Invalid address: " + server_ip_);
+    }
+}
+
+template <int TYPE>
+void Client<TYPE>::connect_to_server() {
+    if constexpr (TYPE == SOCK_STREAM) {
+        // TCP - устанавливаем соединение
+        if (connect(sock_, (sockaddr*)&serv_addr_, sizeof(serv_addr_)) < 0) {
+            close(sock_);
+            throw std::runtime_error("Connection failed to " + server_ip_ + ":" + std::to_string(port_));
+        }
+        std::cout << "Connected to TCP server " << server_ip_ << ":" << port_ << std::endl;
+    } else {
+        // UDP - не требуется установка соединения, просто сохраняем адрес сервера
+        std::cout << "UDP client ready to send to " << server_ip_ << ":" << port_ << std::endl;
+    }
+}
+
+template <int TYPE>
+void Client<TYPE>::send_message(const std::string& message) {
+    ssize_t bytes_sent;
+    
+    if constexpr (TYPE == SOCK_STREAM) {
+        // TCP - используем send
+        bytes_sent = send(sock_, message.c_str(), message.length(), 0);
+    } else {
+        // UDP - используем sendto
+        bytes_sent = sendto(sock_, message.c_str(), message.length(), 0,
+                           (sockaddr*)&serv_addr_, sizeof(serv_addr_));
+    }
+    
+    if (bytes_sent < 0) {
+        throw std::runtime_error("Send failed");
+    }
+}
+
+template <int TYPE>
+std::string Client<TYPE>::receive_response() {
+    char buffer[1024] = {0};
+    ssize_t bytes_read;
+    
+    if constexpr (TYPE == SOCK_STREAM) {
+        // TCP - используем recv
+        bytes_read = recv(sock_, buffer, sizeof(buffer) - 1, 0);
+    } else {
+        // UDP - используем recvfrom
+        sockaddr_in from_addr{};
+        socklen_t addr_len = sizeof(from_addr);
+        bytes_read = recvfrom(sock_, buffer, sizeof(buffer) - 1, 0,
+                            (sockaddr*)&from_addr, &addr_len);
+    }
+    
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        return std::string(buffer);
+    } else if (bytes_read == 0) {
+        throw std::runtime_error("Connection closed by server");
+    } else {
+        throw std::runtime_error("Receive failed");
+    }
+}
+
+template <int TYPE>
+void Client<TYPE>::run() {
+    std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
+    
+    while (true) {
+        // Получаем сообщение от пользователя
+        std::cout << "Enter message: ";
+        std::string message;
+        std::getline(std::cin, message);
+        
+        // Проверяем команду выхода
+        if (message == "quit" || message == "exit") {
+            std::cout << "Exiting client..." << std::endl;
+            break;
+        }
+        
+        // Проверяем пустое сообщение
+        if (message.empty()) {
+            std::cout << "Message cannot be empty. Try again." << std::endl;
+            continue;
+        }
+        
+        try {
+            // Отправляем сообщение
+            send_message(message);
+            
+            // Получаем ответ
+            std::string response = receive_response();
+            std::cout << "Server response: " << response << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            break;
+        }
+        
+        // Спрашиваем, продолжать ли
+        std::cout << "Continue? (y/n): ";
+        std::string answer;
+        std::getline(std::cin, answer);
+        
+        if (answer == "n" || answer == "N" || answer == "no") {
+            std::cout << "Exiting client..." << std::endl;
+            break;
+        }
+    }
+}
+
+// Псевдонимы для удобства
+using TcpClient = Client<SOCK_STREAM>;
+using UdpClient = Client<SOCK_DGRAM>;

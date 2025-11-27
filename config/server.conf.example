@@ -1,0 +1,19 @@
+# Async TCP/UDP Server Configuration
+# This file is read by the server if no environment variables are set
+
+# Server port (can be overridden by SERVER_PORT environment variable)
+port=8080
+
+# Log level: debug, info, warning, error
+log_level=info
+
+# Maximum connections
+max_connections=1000
+
+# Timeouts (seconds)
+tcp_timeout=300
+udp_timeout=60
+
+# Buffer sizes
+tcp_buffer_size=4096
+udp_buffer_size=1024

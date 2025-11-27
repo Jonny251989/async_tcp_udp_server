@@ -1,6 +1,8 @@
 #include "server.hpp"
 #include <iostream>
 #include <atomic>
+#include <memory>
+#include <vector>
 
 std::atomic<bool> global_shutdown_flag{false};
 
@@ -11,11 +13,22 @@ void signal_handler(int signal) {
 
 Server::Server(uint16_t port) 
     : port_(port)
-    , command_processor_(session_manager_)
+    , command_processor_(create_commands())
     , shutdown_requested_(false) {}
 
 Server::~Server() {
     stop();
+}
+
+std::vector<std::unique_ptr<Command>> Server::create_commands() {
+    std::vector<std::unique_ptr<Command>> commands;
+    
+    // Создаем команды с использованием make_unique
+    commands.push_back(std::make_unique<TimeCommand>());
+    commands.push_back(std::make_unique<StatsCommand>(session_manager_));
+    commands.push_back(std::make_unique<ShutdownCommand>());
+    
+    return commands;
 }
 
 bool Server::start() {

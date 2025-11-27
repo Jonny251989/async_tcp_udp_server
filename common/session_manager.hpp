@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../common/protocol.hpp"
 #include <iostream>
 #include <unordered_set>
 #include <atomic>

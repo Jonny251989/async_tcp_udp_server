@@ -1,6 +1,6 @@
 #pragma once
 
-#include "network_utils.hpp"
+#include "eventloop.hpp"
 #include "tcp_handler.hpp"
 #include "udp_handler.hpp"
 #include "command_processor.hpp"
@@ -10,6 +10,7 @@
 #include <atomic>
 #include <csignal>
 #include <vector>
+#include <iostream>
 
 class Server {
 public:

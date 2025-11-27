@@ -1,0 +1,17 @@
+Package: async-tcp-udp-server
+Version: 1.0.0
+Section: net
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.34), libstdc++6 (>= 11)
+Maintainer: Your Name <your.email@example.com>
+Description: Async TCP/UDP Server
+ High-performance asynchronous server supporting both TCP and UDP protocols
+ with command processing and session management.
+ .
+ Features:
+  * Async I/O with epoll
+  * TCP and UDP protocols support
+  * Command processing (/time, /stats, /shutdown)
+  * Session management and statistics
+  * Systemd integration

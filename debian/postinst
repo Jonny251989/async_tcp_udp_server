@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+
+echo "Setting up async-tcp-udp-server..."
+
+# Create user and group
+if ! getent group async-server >/dev/null; then
+    groupadd -r async-server
+fi
+
+if ! getent passwd async-server >/dev/null; then
+    useradd -r -g async-server -s /bin/false -d /opt/async-tcp-udp-server -M async-server
+fi
+
+# Create directories
+mkdir -p /opt/async-tcp-udp-server /var/log/async-tcp-udp-server
+chown async-server:async-server /opt/async-tcp-udp-server /var/log/async-tcp-udp-server
+
+# Reload systemd
+systemctl daemon-reload 2>/dev/null || true
+
+# Enable service (but don't start automatically)
+systemctl enable async-tcp-udp-server 2>/dev/null || true
+
+echo "async-tcp-udp-server installed successfully"
+echo "Edit /etc/async-tcp-udp-server/server.conf and run:"
+echo "  systemctl start async-tcp-udp-server"

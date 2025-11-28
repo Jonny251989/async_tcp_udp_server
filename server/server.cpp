@@ -1,8 +1,5 @@
 #include "server.hpp"
-#include <iostream>
-#include <atomic>
-#include <memory>
-#include <vector>
+
 
 std::atomic<bool> global_shutdown_flag{false};
 
@@ -96,14 +93,14 @@ void Server::setup_udp_handler() {
 }
 
 void Server::handle_tcp_connection(std::shared_ptr<TcpConnection> connection) {
-    session_manager_.add_connection(connection->get_fd());
+    session_manager_.add_connection();  // БЕЗ ПАРАМЕТРА fd!
     
     connection->set_message_callback([this, connection](const auto& message) {
         handle_tcp_message(message, connection);
     });
     
     connection->set_close_callback([this, connection]() {
-        session_manager_.remove_connection(connection->get_fd());
+        session_manager_.remove_connection();  // БЕЗ ПАРАМЕТРА fd!
         event_loop_.remove_fd(connection->get_fd());
     });
     

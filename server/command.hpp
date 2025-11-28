@@ -2,7 +2,7 @@
 
 #include <string>
 #include <memory>
-#include "../common/session_manager.hpp"
+#include "session_manager.hpp"
 #include <chrono>
 #include <sstream>
 #include <iomanip>

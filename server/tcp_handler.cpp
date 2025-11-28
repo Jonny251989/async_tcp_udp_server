@@ -1,6 +1,9 @@
 #include "tcp_handler.hpp"
 
-TcpHandler::TcpHandler(uint16_t port) : port_(port), socket_fd_(-1) {}
+TcpHandler::TcpHandler(uint16_t port, std::shared_ptr<SessionManager> session_manager) 
+    : port_(port)
+    , session_manager_(session_manager)
+    , socket_fd_(-1) {}
 
 TcpHandler::~TcpHandler() {
     stop();
@@ -57,13 +60,12 @@ void TcpHandler::handle_accept() {
     int client_fd = accept(socket_fd_, reinterpret_cast<sockaddr*>(&client_addr), &client_len);
     
     if (client_fd != -1) {
-        // Set client socket to non-blocking
         int flags = fcntl(client_fd, F_GETFL, 0);
         if (flags != -1) {
             fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
         }
         
-        auto connection = std::make_shared<TcpConnection>(client_fd, client_addr);
+        auto connection = std::make_shared<TcpConnection>(client_fd, client_addr, session_manager_);
         connections_[client_fd] = connection;
         
         if (connection_callback_) {

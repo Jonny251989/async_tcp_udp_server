@@ -11,18 +11,17 @@ SYSTEMD_DIR = systemd
 CONFIG_DIR = config
 SCRIPTS_DIR = scripts
 
-# Source files
-COMMON_SOURCES = $(COMMON_DIR)/session_manager.cpp
+# Source files - session_manager перемещен в server
 SERVER_SOURCES = $(SERVER_DIR)/main.cpp $(SERVER_DIR)/server.cpp \
                  $(SERVER_DIR)/tcp_handler.cpp $(SERVER_DIR)/udp_handler.cpp \
                  $(SERVER_DIR)/tcp_connection.cpp $(SERVER_DIR)/command_processor.cpp \
                  $(SERVER_DIR)/eventloop.cpp \
-				 $(SERVER_DIR)/command.cpp
+                 $(SERVER_DIR)/command.cpp \
+                 $(SERVER_DIR)/session_manager.cpp  # ← ПЕРЕМЕЩЕН СЮДА
 
 CLIENT_SOURCES = $(CLIENT_DIR)/main.cpp
 
 # Object files
-COMMON_OBJS = $(patsubst $(COMMON_DIR)/%.cpp,$(BUILD_DIR)/common/%.o,$(COMMON_SOURCES))
 SERVER_OBJS = $(patsubst $(SERVER_DIR)/%.cpp,$(BUILD_DIR)/server/%.o,$(SERVER_SOURCES))
 CLIENT_OBJS = $(patsubst $(CLIENT_DIR)/%.cpp,$(BUILD_DIR)/client/%.o,$(CLIENT_SOURCES))
 
@@ -41,17 +40,13 @@ DEB_PKG = $(PKG_NAME)_$(PKG_VERSION)_$(PKG_ARCH).deb
 
 all: $(TARGET_SERVER) $(TARGET_CLIENT)
 
-$(TARGET_SERVER): $(COMMON_OBJS) $(SERVER_OBJS)
+$(TARGET_SERVER): $(SERVER_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
 $(TARGET_CLIENT): $(CLIENT_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $^ -o $@
-
-$(BUILD_DIR)/common/%.o: $(COMMON_DIR)/%.cpp
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/server/%.o: $(SERVER_DIR)/%.cpp
 	@mkdir -p $(@D)

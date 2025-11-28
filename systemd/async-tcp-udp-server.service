@@ -34,7 +34,7 @@ LimitNOFILE=65536
 # Restart policy
 Restart=on-failure
 RestartSec=5s
-TimeoutStopSec=30s
+TimeoutStopSec=60s
 
 # Logging
 StandardOutput=journal

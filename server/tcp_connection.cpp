@@ -1,10 +1,20 @@
 #include "tcp_connection.hpp"
 
 
-TcpConnection::TcpConnection(int fd, const sockaddr_in& client_addr)
-    : fd_(fd), client_addr_(client_addr) {}
+TcpConnection::TcpConnection(int fd, const sockaddr_in& client_addr, std::shared_ptr<SessionManager> session_manager)
+    : fd_(fd)
+    , client_addr_(client_addr)
+    , session_manager_(session_manager) {
+    
+    if (session_manager_) {
+        session_manager_->add_connection();
+    }
+}
 
 TcpConnection::~TcpConnection() {
+    if (session_manager_) {
+        session_manager_->remove_connection();
+    }
     close();
 }
 

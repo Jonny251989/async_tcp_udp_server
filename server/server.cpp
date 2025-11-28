@@ -1,6 +1,5 @@
 #include "server.hpp"
 
-
 std::atomic<bool> global_shutdown_flag{false};
 
 void signal_handler(int signal) {
@@ -10,6 +9,7 @@ void signal_handler(int signal) {
 
 Server::Server(uint16_t port) 
     : port_(port)
+    , session_manager_(std::make_shared<SessionManager>())
     , command_processor_(create_commands())
     , shutdown_requested_(false) {}
 
@@ -20,9 +20,8 @@ Server::~Server() {
 std::vector<std::unique_ptr<Command>> Server::create_commands() {
     std::vector<std::unique_ptr<Command>> commands;
     
-    // Создаем команды с использованием make_unique
     commands.push_back(std::make_unique<TimeCommand>());
-    commands.push_back(std::make_unique<StatsCommand>(session_manager_));
+    commands.push_back(std::make_unique<StatsCommand>(*session_manager_));
     commands.push_back(std::make_unique<ShutdownCommand>());
     
     return commands;
@@ -32,7 +31,7 @@ bool Server::start() {
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
     
-    tcp_handler_ = std::make_unique<TcpHandler>(port_);
+    tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
     udp_handler_ = std::make_unique<UdpHandler>(port_);
     
     if (!tcp_handler_->start() || !udp_handler_->start()) {
@@ -63,7 +62,7 @@ void Server::stop() {
 
 void Server::run() {
     while (!shutdown_requested_ && !global_shutdown_flag) {
-        event_loop_.run(1000); // 1 second timeout
+        event_loop_.run(100);
     }
     stop();
 }
@@ -93,14 +92,11 @@ void Server::setup_udp_handler() {
 }
 
 void Server::handle_tcp_connection(std::shared_ptr<TcpConnection> connection) {
-    session_manager_.add_connection();  // БЕЗ ПАРАМЕТРА fd!
-    
     connection->set_message_callback([this, connection](const auto& message) {
         handle_tcp_message(message, connection);
     });
     
     connection->set_close_callback([this, connection]() {
-        session_manager_.remove_connection();  // БЕЗ ПАРАМЕТРА fd!
         event_loop_.remove_fd(connection->get_fd());
     });
     
@@ -127,7 +123,10 @@ void Server::handle_tcp_message(const std::string& message, std::shared_ptr<TcpC
 }
 
 void Server::handle_udp_message(const std::string& message, const sockaddr_in& client_addr) {
-    session_manager_.increment_total_connections();
+
+    if (session_manager_ && !message.empty()) {
+        session_manager_->increment_total_connections();
+    }
     
     std::string response = command_processor_.process_command(message);
     

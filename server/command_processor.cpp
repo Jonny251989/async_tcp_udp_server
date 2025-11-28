@@ -1,22 +1,18 @@
 #include "command_processor.hpp"
-#include <memory>
 
-CommandProcessor::CommandProcessor(std::vector<std::unique_ptr<Command>> commands) 
-    : commands_(std::move(commands)) {
-    
-    // Инициализируем карту команд для быстрого доступа
-    for (auto& command : commands_) {
-        command_map_[command->name()] = command.get();
+CommandProcessor::CommandProcessor(std::vector<std::unique_ptr<Command>> &&commands) {
+
+    for (auto &&command : commands) {
+        std::string key = command->name();
+        command_map_[key] = std::move(command);
     }
 }
 
 std::string CommandProcessor::process_command(const std::string& command) {
-    // Проверяем, является ли сообщение командой
     if (!is_command(command)) {
         return handle_mirror(command);
     }
     
-    // Ищем команду в карте
     auto it = command_map_.find(command);
     if (it != command_map_.end()) {
         return it->second->execute();
@@ -26,7 +22,6 @@ std::string CommandProcessor::process_command(const std::string& command) {
 }
 
 std::string CommandProcessor::handle_mirror(const std::string& message) {
-    // Просто возвращаем полученное сообщение обратно
     return message;
 }
 

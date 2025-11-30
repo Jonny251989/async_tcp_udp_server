@@ -1,0 +1,8 @@
+
+#kill process
+sudo pkill -f async_tcp_udp_server
+sudo kill -9 $(sudo lsof -t -i:8080) 2>/dev/null || true
+
+# Проверим что порт свободен
+sudo lsof -i :8080 || echo "Port 8080 is free"
+Port 8080 is free

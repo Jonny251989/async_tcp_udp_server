@@ -11,7 +11,11 @@
 #include <csignal>
 #include <vector>
 #include <iostream>
+#include <netinet/in.h>
+#include <thread>     
+#include <chrono>     
 
+#include <sys/epoll.h>
 extern std::atomic<bool> global_shutdown_flag;
 
 class Server {

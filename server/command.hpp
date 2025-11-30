@@ -19,14 +19,14 @@ public:
 // Конкретные реализации команд
 class TimeCommand : public Command {
 public:
-    std::string name() const override { return "/time"; }
+    std::string name() const override { return "time"; }
     std::string execute() override;
 };
 
 class StatsCommand : public Command {
 public:
     explicit StatsCommand(SessionManager& session_manager);
-    std::string name() const override { return "/stats"; }
+    std::string name() const override { return "stats"; }
     std::string execute() override;
 
 private:
@@ -35,6 +35,6 @@ private:
 
 class ShutdownCommand : public Command {
 public:
-    std::string name() const override { return "/shutdown"; }
+    std::string name() const override { return "shutdown"; }
     std::string execute() override;
 };

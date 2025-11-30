@@ -1,5 +1,9 @@
 #include "tcp_connection.hpp"
-
+#include <iostream>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstring>
 
 TcpConnection::TcpConnection(int fd, const sockaddr_in& client_addr, std::shared_ptr<SessionManager> session_manager)
     : fd_(fd)
@@ -44,15 +48,30 @@ void TcpConnection::handle_read() {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_read = recv(fd_, buffer, BUFFER_SIZE - 1, 0);
     
+    std::cout << "TcpConnection::handle_read() - bytes_read: " << bytes_read << std::endl;
+    
     if (bytes_read > 0) {
         buffer[bytes_read] = '\0';
         std::string message(buffer);
+        
+        // Убираем лишние пробелы и переводы строк
         message.erase(message.find_last_not_of(" \t\n\r\f\v") + 1);
         
+        std::cout << "TcpConnection: Received message: '" << message << "'" << std::endl;
+        std::cout << "TcpConnection: Message length: " << message.length() << std::endl;
+        
         if (message_callback_) {
+            std::cout << "TcpConnection: Calling message_callback..." << std::endl;
             message_callback_(message);
+        } else {
+            std::cout << "TcpConnection: NO message_callback set!" << std::endl;
         }
     } else if (bytes_read == 0) {
+        std::cout << "TcpConnection: Connection closed by client" << std::endl;
         close();
+    } else {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            std::cout << "TcpConnection: recv error: " << strerror(errno) << std::endl;
+        }
     }
 }

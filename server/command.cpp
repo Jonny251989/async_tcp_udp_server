@@ -35,5 +35,7 @@ std::string StatsCommand::execute() {
 }
 
 std::string ShutdownCommand::execute() {
+    std::cout << "!!! SHUTDOWN COMMAND EXECUTE CALLED !!!" << std::endl;
+    std::cout << "Returning /SHUTDOWN_ACK" << std::endl;
     return "/SHUTDOWN_ACK";
 }

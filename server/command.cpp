@@ -10,11 +10,6 @@ std::string TimeCommand::execute() {
     std::ostringstream oss;
     oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
     
-    char tz_buf[64];
-    if (std::strftime(tz_buf, sizeof(tz_buf), "%Z", &local_tm) > 0) {
-        oss << " " << tz_buf;
-    }
-    
     return oss.str();
 }
 

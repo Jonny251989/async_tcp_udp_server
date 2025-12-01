@@ -3,7 +3,13 @@
 TcpConnection::TcpConnection(int fd, const sockaddr_in& client_addr, std::shared_ptr<SessionManager> session_manager)
     : fd_(fd)
     , client_addr_(client_addr)
-    , session_manager_(session_manager) {}
+    , session_manager_(session_manager) 
+{
+    // Увеличиваем счетчики при создании соединения
+    if (session_manager_) {
+        session_manager_->add_connection();
+    }
+}
 
 TcpConnection::~TcpConnection() {
     close();
@@ -19,6 +25,12 @@ void TcpConnection::close() {
     if (fd_ != -1) {
         ::close(fd_);
         fd_ = -1;
+        
+        // Уменьшаем счетчик при закрытии соединения
+        if (session_manager_) {
+            session_manager_->remove_connection();
+        }
+        
         if (close_callback_) {
             close_callback_();
         }

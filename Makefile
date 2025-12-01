@@ -1,170 +1,153 @@
+.PHONY: all clean install uninstall systemd-install systemd-uninstall test unit-test functional-test systemd-test all-tests clean-test clean-all help
+
+# Основные переменные
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -Icommon -Iserver
+CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Icommon -Iserver -Iclient
 LDFLAGS = -pthread
 
-# Directories
-COMMON_DIR = common
-SERVER_DIR = server
-CLIENT_DIR = client
+# Директории
 BUILD_DIR = build
-SYSTEMD_DIR = systemd
-CONFIG_DIR = config
-SCRIPTS_DIR = scripts
+SERVER_SRC_DIR = server
+CLIENT_SRC_DIR = client
+TEST_SRC_DIR = tests
 
-# Source files - session_manager перемещен в server
-SERVER_SOURCES = $(SERVER_DIR)/main.cpp $(SERVER_DIR)/server.cpp \
-                 $(SERVER_DIR)/tcp_handler.cpp $(SERVER_DIR)/udp_handler.cpp \
-                 $(SERVER_DIR)/tcp_connection.cpp $(SERVER_DIR)/command_processor.cpp \
-                 $(SERVER_DIR)/eventloop.cpp \
-                 $(SERVER_DIR)/command.cpp \
-                 $(SERVER_DIR)/session_manager.cpp  # ← ПЕРЕМЕЩЕН СЮДА
+# Файлы сервера
+SERVER_SRCS = $(SERVER_SRC_DIR)/main.cpp \
+              $(SERVER_SRC_DIR)/server.cpp \
+              $(SERVER_SRC_DIR)/tcp_handler.cpp \
+              $(SERVER_SRC_DIR)/udp_handler.cpp \
+              $(SERVER_SRC_DIR)/tcp_connection.cpp \
+              $(SERVER_SRC_DIR)/command_processor.cpp \
+              $(SERVER_SRC_DIR)/eventloop.cpp \
+              $(SERVER_SRC_DIR)/command.cpp \
+              $(SERVER_SRC_DIR)/session_manager.cpp
 
-CLIENT_SOURCES = $(CLIENT_DIR)/main.cpp
+SERVER_OBJS = $(SERVER_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Object files
-SERVER_OBJS = $(patsubst $(SERVER_DIR)/%.cpp,$(BUILD_DIR)/server/%.o,$(SERVER_SOURCES))
-CLIENT_OBJS = $(patsubst $(CLIENT_DIR)/%.cpp,$(BUILD_DIR)/client/%.o,$(CLIENT_SOURCES))
+# Файлы клиента - только main.cpp, так как client.hpp это заголовочный файл с реализацией
+CLIENT_SRCS = $(CLIENT_SRC_DIR)/main.cpp
+CLIENT_OBJS = $(CLIENT_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Targets
-TARGET_SERVER = $(BUILD_DIR)/async_tcp_udp_server
-TARGET_CLIENT = $(BUILD_DIR)/client_app
+# Файлы юнит-тестов
+UNIT_TEST_SRCS = $(TEST_SRC_DIR)/unit/test_main.cpp \
+                 $(TEST_SRC_DIR)/unit/test_command_processor.cpp \
+                 $(TEST_SRC_DIR)/unit/test_session_manager.cpp 
+UNIT_TEST_OBJS = $(UNIT_TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Package info
-PKG_NAME = async-tcp-udp-server
-PKG_VERSION = 1.0.0
-PKG_ARCH = amd64
-DEB_DIR = $(BUILD_DIR)/deb
-DEB_PKG = $(PKG_NAME)_$(PKG_VERSION)_$(PKG_ARCH).deb
+# Основные цели
+all: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
 
-.PHONY: all clean install uninstall package systemd-install systemd-uninstall env-test
-
-all: $(TARGET_SERVER) $(TARGET_CLIENT)
-
-$(TARGET_SERVER): $(SERVER_OBJS)
+$(BUILD_DIR)/async_tcp_udp_server: $(SERVER_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(TARGET_CLIENT): $(CLIENT_OBJS)
+$(BUILD_DIR)/client_app: $(CLIENT_OBJS)
 	@mkdir -p $(@D)
-	$(CXX) $^ -o $@
+	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(BUILD_DIR)/server/%.o: $(SERVER_DIR)/%.cpp
-	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/client/%.o: $(CLIENT_DIR)/%.cpp
+# Правила компиляции
+$(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+# Очистка
 clean:
 	rm -rf $(BUILD_DIR)
 
-# Installation
-install: $(TARGET_SERVER)
+# Установка
+install: all
 	install -d /usr/local/bin
-	install -m 755 $(TARGET_SERVER) /usr/local/bin/
-	install -m 755 $(TARGET_CLIENT) /usr/local/bin/async_client
-	install -d /etc/$(PKG_NAME)
-	install -m 644 $(CONFIG_DIR)/server.conf.example /etc/$(PKG_NAME)/server.conf 2>/dev/null || true
+	install -m 755 $(BUILD_DIR)/async_tcp_udp_server /usr/local/bin/
+	install -m 755 $(BUILD_DIR)/client_app /usr/local/bin/async_client
+	install -d /etc/async-tcp-udp-server
+	install -m 644 config/server.conf.example /etc/async-tcp-udp-server/server.conf 2>/dev/null || true
 	@echo "Server installed to /usr/local/bin/async_tcp_udp_server"
 	@echo "Client installed to /usr/local/bin/async_client"
-	@echo "Config: /etc/$(PKG_NAME)/server.conf"
+	@echo "Config: /etc/async-tcp-udp-server/server.conf"
 
-# Systemd installation
-systemd-install: $(TARGET_SERVER)
-	@echo "Installing systemd service..."
-	install -d /lib/systemd/system
-	install -m 644 $(SYSTEMD_DIR)/async-tcp-udp-server.service /lib/systemd/system/
-	@echo "Creating system user..."
-	@-useradd -r -s /bin/false -d /opt/$(PKG_NAME) -M async-server 2>/dev/null || true
-	@mkdir -p /opt/$(PKG_NAME) /var/log/$(PKG_NAME)
-	@chown async-server:async-server /opt/$(PKG_NAME) /var/log/$(PKG_NAME)
-	@echo "Enabling service..."
-	-systemctl daemon-reload
-	-systemctl enable async-tcp-udp-server
-	@echo "Systemd service installed. Start with: systemctl start async-tcp-udp-server"
-
-# Systemd uninstall
-systemd-uninstall:
-	-systemctl stop async-tcp-udp-server 2>/dev/null || true
-	-systemctl disable async-tcp-udp-server 2>/dev/null || true
-	-rm -f /lib/systemd/system/async-tcp-udp-server.service
-	-systemctl daemon-reload
-	@echo "Systemd service uninstalled"
-
-# Debian package
-package: clean all
-	@echo "Building Debian package..."
-	@rm -rf $(DEB_DIR)
-	@mkdir -p $(DEB_DIR)/DEBIAN
-	@mkdir -p $(DEB_DIR)/usr/local/bin
-	@mkdir -p $(DEB_DIR)/lib/systemd/system
-	@mkdir -p $(DEB_DIR)/etc/$(PKG_NAME)
-	@mkdir -p $(DEB_DIR)/opt/$(PKG_NAME)
-	
-	# Copy binaries
-	install -m 755 $(TARGET_SERVER) $(DEB_DIR)/usr/local/bin/async_tcp_udp_server
-	install -m 755 $(TARGET_CLIENT) $(DEB_DIR)/usr/local/bin/async_client
-	install -m 644 $(SYSTEMD_DIR)/async-tcp-udp-server.service $(DEB_DIR)/lib/systemd/system/
-	install -m 644 $(CONFIG_DIR)/server.conf.example $(DEB_DIR)/etc/$(PKG_NAME)/server.conf
-	
-	# Control file
-	@cp debian/control $(DEB_DIR)/DEBIAN/
-	@cp debian/postinst $(DEB_DIR)/DEBIAN/ && chmod 755 $(DEB_DIR)/DEBIAN/postinst
-	@cp debian/prerm $(DEB_DIR)/DEBIAN/ && chmod 755 $(DEB_DIR)/DEBIAN/prerm
-	
-	# Build package
-	dpkg-deb --build $(DEB_DIR) $(DEB_PKG)
-	@echo "Package built: $(DEB_PKG)"
-
-# Uninstall
-uninstall: systemd-uninstall
-	-rm -f /usr/local/bin/async_tcp_udp_server
-	-rm -f /usr/local/bin/async_client
-	-rm -rf /etc/$(PKG_NAME)
+# Удаление
+uninstall:
+	systemctl stop async-tcp-udp-server 2>/dev/null || true
+	systemctl disable async-tcp-udp-server 2>/dev/null || true
+	rm -f /lib/systemd/system/async-tcp-udp-server.service
+	systemctl daemon-reload
+	rm -f /usr/local/bin/async_tcp_udp_server
+	rm -f /usr/local/bin/async_client
+	rm -rf /etc/async-tcp-udp-server
 	@echo "Server uninstalled"
 
-# Environment variables test
-env-test:
-	@echo "=== Environment Variables Test ==="
-	@echo "Current environment:"
-	@echo "SERVER_PORT=$${SERVER_PORT:-not set}"
-	@echo "LOG_LEVEL=$${LOG_LEVEL:-not set}"
-	@echo ""
-	@echo "To set environment:"
-	@echo "  export SERVER_PORT=9090"
-	@echo "  export LOG_LEVEL=debug"
-	@echo "  ./$(TARGET_SERVER)"
+# Systemd
+systemd-install:
+	@echo "Installing systemd service..."
+	install -d /lib/systemd/system
+	install -m 644 systemd/async-tcp-udp-server.service /lib/systemd/system/
+	@echo "Creating system user..."
+	@if ! id async-server >/dev/null 2>&1; then \
+		useradd -r -s /usr/sbin/nologin async-server 2>/dev/null || true; \
+	fi
+	@echo "Enabling service..."
+	systemctl daemon-reload
+	systemctl enable async-tcp-udp-server
+	@echo "Systemd service installed. Start with: systemctl start async-tcp-udp-server"
 
-# Service management
-status:
-	systemctl status async-tcp-udp-server
+# ====== ТЕСТЫ ======
+TEST_BUILD_DIR = $(BUILD_DIR)/tests
 
-logs:
-	journalctl -u async-tcp-udp-server -f
+# Три уровня тестов:
+# 1. test - юнит и функциональные (без sudo)
+# 2. systemd-test - тесты systemd (требуют sudo)
+# 3. all-tests - все тесты вместе
 
-restart:
-	systemctl restart async-tcp-udp-server
+.PHONY: test unit-test functional-test systemd-test all-tests
 
-stop:
-	systemctl stop async-tcp-udp-server
+test: unit-test functional-test
+	@echo "=== Unit and Functional Tests PASSED ==="
 
-start:
-	systemctl start async-tcp-udp-server
+all-tests: test systemd-test
+	@echo "=== ALL TESTS PASSED ==="
 
-quick_test: $(TARGET_SERVER) $(TARGET_CLIENT)
-	@echo "Starting quick test..."
-	@./scripts/test_server.sh
+unit-test: $(TEST_BUILD_DIR)/unit_tests
+	@echo "=== Running unit tests ==="
+	@$(TEST_BUILD_DIR)/unit_tests
 
+functional-test: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
+	@echo "=== Running functional tests (no sudo) ==="
+	@bash $(TEST_SRC_DIR)/functional/test_server.sh
+
+systemd-test: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
+	@echo "=== Running systemd integration tests (requires sudo) ==="
+	@sudo bash $(TEST_SRC_DIR)/functional/systemd_test.sh
+
+# Сборка юнит-тестов
+$(TEST_BUILD_DIR)/unit_tests: $(UNIT_TEST_OBJS) \
+                              $(BUILD_DIR)/server/command.o \
+                              $(BUILD_DIR)/server/session_manager.o \
+                              $(BUILD_DIR)/server/command_processor.o
+	@mkdir -p $(TEST_BUILD_DIR)
+	@echo "Building unit tests..."
+	$(CXX) $(CXXFLAGS) $^ -lgtest -lgtest_main -lpthread -o $@
+
+# Очистка тестов
+clean-test:
+	rm -rf $(TEST_BUILD_DIR)
+
+# Полная очистка
+clean-all: clean clean-test
+
+# Помощь
 help:
 	@echo "Available targets:"
-	@echo "  all              - Build everything"
-	@echo "  clean            - Clean build"
-	@echo "  install          - Install to system"
-	@echo "  uninstall        - Uninstall from system"
-	@echo "  systemd-install  - Install systemd service"
-	@echo "  systemd-uninstall - Uninstall systemd service"
-	@echo "  package          - Build Debian package"
-	@echo "  env-test         - Test environment variables"
-	@echo "  status|logs|restart|start|stop - Service management"
-	@echo "  quick_test       - Run quick test"
+	@echo "  all               - Build server and client"
+	@echo "  clean             - Clean build directory"
+	@echo "  install           - Install binaries and configs"
+	@echo "  uninstall         - Uninstall everything"
+	@echo "  systemd-install   - Install systemd service"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  test              - Run unit + functional tests (no sudo)"
+	@echo "  unit-test         - Run unit tests only"
+	@echo "  functional-test   - Run functional tests (bash script, no sudo)"
+	@echo "  systemd-test      - Run systemd tests (requires sudo)"
+	@echo "  all-tests         - Run ALL tests (unit + functional + systemd)"
+	@echo "  clean-test        - Clean test build directory"
+	@echo "  clean-all         - Clean everything"

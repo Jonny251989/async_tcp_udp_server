@@ -22,6 +22,7 @@ private:
     void connect_to_server();
     void send_message(const std::string& message);
     std::string receive_response();
+    bool is_interactive() const { return isatty(STDIN_FILENO); }
     
     std::string server_ip_;
     uint16_t port_;
@@ -109,32 +110,62 @@ std::string Client<TYPE>::receive_response() {
 
 template <int TYPE>
 void Client<TYPE>::run() {
-    std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
-    
-    while (true) {
-        std::cout << "Enter message: ";
+    if (!is_interactive()) {
+        // Pipe mode - читаем из stdin до конца
         std::string message;
-        std::getline(std::cin, message);
-        
-        if (message == "quit" || message == "exit") break;
-        if (message.empty()) {
-            std::cout << "Message cannot be empty. Try again." << std::endl;
-            continue;
+        while (std::getline(std::cin, message)) {
+            if (message.empty()) continue;
+            
+            try {
+                send_message(message + "\n");
+                std::string response = receive_response();
+                std::cout << response << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+                break;
+            }
         }
+    } else {
+        // Interactive mode
+        std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
         
-        try {
-            send_message(message + "\n");
-            std::string response = receive_response();
-            std::cout << "Server response: " << response << std::endl;
+        while (true) {
+            std::cout << "Enter message: ";
+            std::string message;
+            if (!std::getline(std::cin, message)) {
+                break; // EOF или ошибка ввода
+            }
             
-            std::cout << "Continue? (y/n): ";
-            std::string answer;
-            std::getline(std::cin, answer);
-            if (answer == "n" || answer == "N" || answer == "no") break;
+            if (message == "quit" || message == "exit") {
+                std::cout << "Exiting client..." << std::endl;
+                break;
+            }
             
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-            break;
+            if (message.empty()) {
+                std::cout << "Message cannot be empty. Try again." << std::endl;
+                continue;
+            }
+            
+            try {
+                send_message(message + "\n");
+                std::string response = receive_response();
+                std::cout << "Server response: " << response << std::endl;
+                
+                std::cout << "Continue? (y/n): ";
+                std::string answer;
+                if (!std::getline(std::cin, answer)) {
+                    break;
+                }
+                
+                if (answer == "n" || answer == "N" || answer == "no") {
+                    std::cout << "Exiting client..." << std::endl;
+                    break;
+                }
+                
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+                break;
+            }
         }
     }
 }

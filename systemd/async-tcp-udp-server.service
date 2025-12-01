@@ -1,5 +1,4 @@
-# Создай правильный unit файл
-cat > systemd/async-tcp-udp-server.service << 'EOF'
+# systemd/async-tcp-udp-server.service
 [Unit]
 Description=Async TCP/UDP Server
 After=network.target
@@ -11,26 +10,29 @@ User=async-server
 Group=async-server
 
 Environment=SERVER_PORT=8080
-Environment=LOG_LEVEL=info
 
 ExecStart=/usr/local/bin/async_tcp_udp_server
+ExecStop=/bin/kill -TERM $MAINPID
 
+# Более агрессивные таймауты
 TimeoutStopSec=10
-TimeoutStartSec=5
-KillMode=mixed
+TimeoutStartSec=10
+KillMode=process
 KillSignal=SIGTERM
 
+# Важно: НЕ перезапускать после остановки
 Restart=no
 
+# Security
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict
 ProtectHome=yes
 
+# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=async-tcp-udp-server
 
 [Install]
 WantedBy=multi-user.target
-EOF

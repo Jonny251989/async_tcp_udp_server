@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <ctime>
 
-// Абстрактный базовый класс для команд
 class Command {
 public:
     virtual ~Command() = default;
@@ -16,7 +15,6 @@ public:
     virtual std::string execute() = 0;
 };
 
-// Конкретные реализации команд
 class TimeCommand : public Command {
 public:
     std::string name() const override { return "time"; }

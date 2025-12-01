@@ -6,16 +6,10 @@ SessionManager::SessionManager()
 void SessionManager::add_connection() {
     total_connections_++;
     current_connections_++;
-    
-    std::cout << "New connection. Total: " << total_connections_.load() 
-              << ", Current: " << current_connections_.load() << std::endl;
 }
 
 void SessionManager::remove_connection() {
     current_connections_--;
-    
-    std::cout << "Client disconnected. Current connections: " 
-              << current_connections_.load() << std::endl;
 }
 
 void SessionManager::increment_total_connections() {

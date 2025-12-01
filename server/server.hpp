@@ -16,6 +16,7 @@
 #include <chrono>     
 
 #include <sys/epoll.h>
+
 extern std::atomic<bool> global_shutdown_flag;
 
 class Server {
@@ -24,22 +25,23 @@ public:
     ~Server();
     
     bool start();
-    void stop();
     void run();
+    void stop();
 
 private:
+    std::vector<std::unique_ptr<Command>> create_commands();
     void setup_tcp_handler();
     void setup_udp_handler();
     void handle_tcp_connection(std::shared_ptr<TcpConnection> connection);
     void handle_tcp_message(const std::string& message, std::shared_ptr<TcpConnection> connection);
     void handle_udp_message(const std::string& message, const sockaddr_in& client_addr);
-    std::vector<std::unique_ptr<Command>> create_commands();
+     void stop_immediate();  // Добавить эту строку если нужно
 
     uint16_t port_;
-    std::shared_ptr<SessionManager> session_manager_;
-    CommandProcessor command_processor_;
     std::unique_ptr<TcpHandler> tcp_handler_;
     std::unique_ptr<UdpHandler> udp_handler_;
     EventLoop event_loop_;
-    std::atomic<bool> shutdown_requested_;
+    std::shared_ptr<SessionManager> session_manager_;
+    CommandProcessor command_processor_;
+    bool shutdown_requested_;
 };

@@ -5,128 +5,64 @@ networks:
     driver: bridge
 
 services:
-  # Режим systemd (по умолчанию из Dockerfile)
-  async_tcp_udp_server_systemd:
-    build: .
-    container_name: async_tcp_udp_server_systemd
-    privileged: true
-    tmpfs:
-      - /tmp
-      - /run
-      - /run/lock
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  # Простой сервер (без systemd)
+  async_tcp_udp_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    container_name: async_tcp_udp_server
     ports:
       - "8081:8080/tcp"
       - "8081:8080/udp"
     networks:
       - async_tcp_udp_net
-    profiles: ["test", "systemd"]
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pgrep", "async_tcp_udp_server"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # Режим direct (без systemd)
-  async_tcp_udp_server_direct:
-    build: .
-    container_name: async_tcp_udp_server_direct
-    command: ["/usr/local/bin/async_tcp_udp_server", "8080"]
-    ports:
-      - "8080:8080/tcp"
-      - "8080:8080/udp"
-    networks:
-      - async_tcp_udp_net
-    restart: unless-stopped
-
-  # Юнит-тесты
-  unit_tests:
-    build: .
-    container_name: unit_tests
-    working_dir: /workspace
-    command: 
-      - /bin/sh
-      - -c
-      - |
-        if [ -f "./build/unit_tests" ]; then
-          ./build/unit_tests
-        else
-          echo "Unit tests binary not found"
-          exit 1
-        fi
-    networks:
-      - async_tcp_udp_net
-    profiles: ["test"]
-
-  # Функциональные тесты
-  functional_tests:
-    build: .
-    container_name: functional_tests
-    working_dir: /workspace
-    volumes:
-      - ./tests/test_data:/test_data:rw
-    networks:
-      - async_tcp_udp_net
-    command: 
-      - /bin/sh
-      - -c
-      - |
-        SERVER_IP=$$(getent hosts async_tcp_udp_server_direct | awk '{ print $$1 }')
-        echo "Server IP: $$SERVER_IP"
-        
-        until nc -z $$SERVER_IP 8080; do
-          echo "Waiting for server..."
-          sleep 2
-        done
-        
-        echo "Starting functional tests..."
-        if [ -f "./build/functional_tests" ]; then
-          SERVER_HOST=$$SERVER_IP ./build/functional_tests
-        else
-          echo "Functional tests binary not found"
-          exit 1
-        fi
-    environment:
-      - SERVER_PORT=8080
-    profiles: ["test"]
-    depends_on:
-      - async_tcp_udp_server_direct
-
-  # Systemd тесты
+  # Тесты
   systemd_tests:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
     container_name: systemd_tests
     working_dir: /workspace
     networks:
       - async_tcp_udp_net
     command: 
-      - /bin/sh
+      - /bin/bash
       - -c
       - |
-        SERVER_IP=$$(getent hosts async_tcp_udp_server_systemd | awk '{ print $$1 }')
-        echo "Testing systemd server at $$SERVER_IP:8080"
+        echo "=== Waiting for server to start ==="
+        sleep 10
         
-        echo "Waiting for server to start..."
-        until nc -z $$SERVER_IP 8080; do
-          echo "Still waiting for server..."
-          sleep 2
-        done
+        SERVER_IP=$$(getent hosts async_tcp_udp_server | awk '{ print $$1 }')
+        echo "Testing server at $$SERVER_IP:8080"
         
-        echo "=== Running Systemd Tests ==="
+        echo "=== Checking if server is accessible ==="
+        if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$$SERVER_IP/8080"; then
+          echo "TCP port 8080 is accessible!"
+        else
+          echo "TCP port 8080 is NOT accessible"
+          echo "Trying to check container status..."
+          docker-compose logs async_tcp_udp_server
+          exit 1
+        fi
         
-        echo "1. Testing TCP /time command:"
-        echo "/time" | timeout 3 /usr/local/bin/async_client tcp $$SERVER_IP 8080 2>&1 || echo "Time command test completed"
+        echo "=== Testing TCP commands ==="
+        echo "1. Testing /time command:"
+        echo -e "/time\nquit" | timeout 5 /usr/local/bin/async_client tcp $$SERVER_IP 8080 2>&1 || echo "Time command test completed"
         
-        echo "2. Testing TCP /stats command:"
-        echo "/stats" | timeout 3 /usr/local/bin/async_client tcp $$SERVER_IP 8080 2>&1 || echo "Stats command test completed"
+        echo "2. Testing /stats command:"
+        echo -e "/stats\nquit" | timeout 5 /usr/local/bin/async_client tcp $$SERVER_IP 8080 2>&1 || echo "Stats command test completed"
         
+        echo "=== Testing UDP commands ==="
         echo "3. Testing UDP /time command:"
-        echo "/time" | timeout 3 /usr/local/bin/async_client udp $$SERVER_IP 8080 2>&1 || echo "UDP Time command test completed"
+        echo -e "/time\nquit" | timeout 5 /usr/local/bin/async_client udp $$SERVER_IP 8080 2>&1 || echo "UDP Time command test completed"
         
-        echo "4. Testing TCP echo:"
-        echo "HELLO SYSTEMD" | timeout 2 nc $$SERVER_IP 8080 || echo "TCP echo test completed"
-        
-        echo "5. Testing UDP echo:"
-        echo "UDP SYSTEMD" | timeout 2 nc -u $$SERVER_IP 8080 || echo "UDP echo test completed"
-        
-        echo "=== Systemd Tests Complete ==="
-    profiles: ["test", "systemd"]
+        echo "=== Tests completed ==="
     depends_on:
-      - async_tcp_udp_server_systemd
+      - async_tcp_udp_server

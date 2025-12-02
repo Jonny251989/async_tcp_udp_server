@@ -1,4 +1,7 @@
 
+chmod +x scripts/test_simple.sh
+
+
 #kill process
 sudo pkill -f async_tcp_udp_server
 sudo kill -9 $(sudo lsof -t -i:8080) 2>/dev/null || true

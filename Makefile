@@ -1,17 +1,14 @@
 .PHONY: all clean install uninstall systemd-install systemd-uninstall test unit-test functional-test systemd-test all-tests clean-test clean-all help
 
-# Основные переменные
 CXX = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Icommon -Iserver -Iclient
 LDFLAGS = -pthread
 
-# Директории
 BUILD_DIR = build
 SERVER_SRC_DIR = server
 CLIENT_SRC_DIR = client
 TEST_SRC_DIR = tests
 
-# Файлы сервера
 SERVER_SRCS = $(SERVER_SRC_DIR)/main.cpp \
               $(SERVER_SRC_DIR)/server.cpp \
               $(SERVER_SRC_DIR)/tcp_handler.cpp \
@@ -24,17 +21,14 @@ SERVER_SRCS = $(SERVER_SRC_DIR)/main.cpp \
 
 SERVER_OBJS = $(SERVER_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Файлы клиента - только main.cpp, так как client.hpp это заголовочный файл с реализацией
 CLIENT_SRCS = $(CLIENT_SRC_DIR)/main.cpp
 CLIENT_OBJS = $(CLIENT_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Файлы юнит-тестов
 UNIT_TEST_SRCS = $(TEST_SRC_DIR)/unit/test_main.cpp \
                  $(TEST_SRC_DIR)/unit/test_command_processor.cpp \
                  $(TEST_SRC_DIR)/unit/test_session_manager.cpp 
 UNIT_TEST_OBJS = $(UNIT_TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# Основные цели
 all: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
 
 $(BUILD_DIR)/async_tcp_udp_server: $(SERVER_OBJS)
@@ -45,16 +39,13 @@ $(BUILD_DIR)/client_app: $(CLIENT_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $^ -o $@ $(LDFLAGS)
 
-# Правила компиляции
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Очистка
 clean:
 	rm -rf $(BUILD_DIR)
 
-# Установка
 install: all
 	install -d /usr/local/bin
 	install -m 755 $(BUILD_DIR)/async_tcp_udp_server /usr/local/bin/
@@ -65,7 +56,7 @@ install: all
 	@echo "Client installed to /usr/local/bin/async_client"
 	@echo "Config: /etc/async-tcp-udp-server/server.conf"
 
-# Удаление
+
 uninstall:
 	systemctl stop async-tcp-udp-server 2>/dev/null || true
 	systemctl disable async-tcp-udp-server 2>/dev/null || true
@@ -76,7 +67,6 @@ uninstall:
 	rm -rf /etc/async-tcp-udp-server
 	@echo "Server uninstalled"
 
-# Systemd
 systemd-install:
 	@echo "Installing systemd service..."
 	install -d /lib/systemd/system
@@ -90,13 +80,8 @@ systemd-install:
 	systemctl enable async-tcp-udp-server
 	@echo "Systemd service installed. Start with: systemctl start async-tcp-udp-server"
 
-# ====== ТЕСТЫ ======
 TEST_BUILD_DIR = $(BUILD_DIR)/tests
 
-# Три уровня тестов:
-# 1. test - юнит и функциональные (без sudo)
-# 2. systemd-test - тесты systemd (требуют sudo)
-# 3. all-tests - все тесты вместе
 
 .PHONY: test unit-test functional-test systemd-test all-tests
 
@@ -118,7 +103,6 @@ systemd-test: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
 	@echo "=== Running systemd integration tests (requires sudo) ==="
 	@sudo bash $(TEST_SRC_DIR)/functional/systemd_test.sh
 
-# Сборка юнит-тестов
 $(TEST_BUILD_DIR)/unit_tests: $(UNIT_TEST_OBJS) \
                               $(BUILD_DIR)/server/command.o \
                               $(BUILD_DIR)/server/session_manager.o \
@@ -127,14 +111,11 @@ $(TEST_BUILD_DIR)/unit_tests: $(UNIT_TEST_OBJS) \
 	@echo "Building unit tests..."
 	$(CXX) $(CXXFLAGS) $^ -lgtest -lgtest_main -lpthread -o $@
 
-# Очистка тестов
 clean-test:
 	rm -rf $(TEST_BUILD_DIR)
 
-# Полная очистка
 clean-all: clean clean-test
 
-# Помощь
 help:
 	@echo "Available targets:"
 	@echo "  all               - Build server and client"

@@ -8,7 +8,6 @@ case "$1" in
     systemd|"")
         echo "Starting with systemd..."
         
-        # Проверяем и включаем сервис
         if [ -f "/etc/systemd/system/async-tcp-udp-server.service" ]; then
             echo "Service file found, enabling it..."
             systemctl enable async-tcp-udp-server.service 2>/dev/null || true
@@ -16,7 +15,6 @@ case "$1" in
             echo "WARNING: Service file not found!"
         fi
         
-        # Запускаем systemd
         exec /sbin/init
         ;;
         
@@ -33,7 +31,6 @@ case "$1" in
         fi
         
         echo "Server port: $PORT"
-        # Запускаем от имени async-server
         exec sudo -u async-server /usr/local/bin/async_tcp_udp_server "$PORT"
         ;;
         

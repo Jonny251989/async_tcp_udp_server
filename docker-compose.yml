@@ -22,7 +22,7 @@ services:
       retries: 3
       start_period: 10s
 
-  # Тесты
+
   systemd_tests:
     build:
       context: .

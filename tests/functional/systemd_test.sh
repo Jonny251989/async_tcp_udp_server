@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Не выходим сразу при ошибках в статусе (код 3 для неактивного сервиса нормален)
 set -e
 
 echo "=== Systemd Integration Test ==="
@@ -20,7 +19,7 @@ echo "3. Waiting for service to start..."
 sleep 2
 
 echo "4. Checking service status..."
-# systemctl is-active возвращает 0 если активен, 3 если неактивен
+
 if systemctl is-active --quiet async-tcp-udp-server; then
     echo "✓ Service is active (as expected)"
     systemctl status async-tcp-udp-server --no-pager
@@ -41,7 +40,7 @@ echo "7. Stopping service..."
 systemctl stop async-tcp-udp-server
 
 echo "8. Checking service stopped gracefully..."
-# Для остановленного сервиса ожидаем код 3 (неактивен) - это нормально
+
 if ! systemctl is-active --quiet async-tcp-udp-server; then
     echo "✓ Service is inactive (as expected after stop)"
     systemctl status async-tcp-udp-server --no-pager || true

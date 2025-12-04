@@ -9,15 +9,14 @@ protected:
     static constexpr const char* SERVER_HOST = "127.0.0.1";
     
     std::string run_client(const std::string& protocol, const std::string& message) {
-        // Простая команда - клиент должен быть в build/client_app
         std::string command = "echo \"" + message + "\" | timeout 2 ./build/client_app " + 
                              protocol + " " + SERVER_HOST + " " + std::to_string(SERVER_PORT);
         
-        // Запускаем команду
+
         FILE* pipe = popen(command.c_str(), "r");
         if (!pipe) return "ERROR: Failed to run client";
         
-        // Читаем вывод
+
         char buffer[1024];
         std::string result;
         while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
@@ -26,13 +25,11 @@ protected:
         
         pclose(pipe);
         
-        // Убираем лишние пробелы
         result.erase(result.find_last_not_of(" \n\r\t") + 1);
         return result;
     }
 };
 
-// Простые тесты
 TEST_F(FunctionalTest, EchoTcp) {
     EXPECT_EQ(run_client("tcp", "Hello"), "Hello");
 }

@@ -26,7 +26,6 @@ protected:
 
 TEST_F(CommandProcessorTest, ProcessTimeCommand) {
     std::string result = processor->process_command("/time");
-    // Проверяем формат времени: YYYY-MM-DD HH:MM:SS
     EXPECT_EQ(result.size(), 19);
     EXPECT_EQ(result[4], '-');
     EXPECT_EQ(result[7], '-');
@@ -35,14 +34,13 @@ TEST_F(CommandProcessorTest, ProcessTimeCommand) {
     EXPECT_EQ(result[16], ':');
 }
 
-TEST_F(CommandProcessorTest, ProcessStatsCommand) {
-    // Добавляем тестовое соединение (без параметров)
+TEST_F(CommandProcessorTest, ProcessStatsCommand) {)
     session_manager->add_connection();
     
     std::string result = processor->process_command("/stats");
     EXPECT_NE(result.find("Total connections"), std::string::npos);
     EXPECT_NE(result.find("Current connections"), std::string::npos);
-    EXPECT_NE(result.find("1"), std::string::npos); // Должна быть хотя бы 1 связь
+    EXPECT_NE(result.find("1"), std::string::npos); 
     
     session_manager->remove_connection();
 }
@@ -54,11 +52,9 @@ TEST_F(CommandProcessorTest, ProcessShutdownCommand) {
 
 TEST_F(CommandProcessorTest, ProcessUnknownCommand) {
     std::string result = processor->process_command("/unknown");
-    // Убедитесь что сообщение об ошибке правильное
-    // Если CommandProcessor возвращает "ERROR: Unknown command '/unknown'", то:
+
     EXPECT_EQ(result, "ERROR: Unknown command '/unknown'");
-    // Или хотя бы проверьте что начинается с "ERROR: Unknown command"
-    // EXPECT_TRUE(result.find("ERROR: Unknown command") != std::string::npos);
+
 }
 
 TEST_F(CommandProcessorTest, ProcessEchoMessage) {

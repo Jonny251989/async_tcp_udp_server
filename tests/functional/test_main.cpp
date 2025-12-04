@@ -11,7 +11,6 @@ int main(int argc, char **argv) {
     std::cout << "2. Client binary should be in build/client" << std::endl;
     std::cout << "=========================================" << std::endl;
     
-    // Устанавливаем переменные окружения для тестов
     setenv("SERVER_HOST", "127.0.0.1", 1);
     setenv("SERVER_PORT", "8080", 1);
     

@@ -29,36 +29,37 @@
 
 # II. Запуск тестов для автоматической проверки работы клиент-серверной модели
 
-    Running unit tests...
+    Запуск unit tests:
         make unit-test
 
-    Running functional tests...
+    Запуск functional tests:
         make functional-test
 
-    To run systemd tests: sudo make systemd-test
+    Запуск systemd tests: 
+        sudo make systemd-test
         sudo tests/functional/systemd_test.sh
 
 
 
 # III. Запуск клиент-серверной модели через Docker
 
-# Cобрать образ
-docker build -t async-systemd .
+ Cобрать образ:
+    docker build -t async-systemd .
 
-# Запустить контейнер
-docker run -d \
-  --name async-test \
-  --privileged \
-  --tmpfs /run \
-  --tmpfs /tmp \
-  -p 8080:8080 \
-  -p 8080:8080/udp \
-  async-systemd
+Запустить контейнер:
+    docker run -d \
+    --name async-test \
+    --privileged \
+    --tmpfs /run \
+    --tmpfs /tmp \
+    -p 8080:8080 \
+    -p 8080:8080/udp \
+    async-systemd
 
-# Проверить
-sleep 5
+Проверить:
+    sleep 5
 
-echo "1. /time: "; echo "/time" | nc -N localhost 8080
-echo "2. /stats: "; echo "/stats" | nc -N localhost 8080
-echo "3. Mirror test: "; echo "Hello World" | nc -N localhost 8080
-echo "4. Unknown command: "; echo "/unknown" | nc -N localhost 8080
+    echo "1. /time: "; echo "/time" | nc -N localhost 8080
+    echo "2. /stats: "; echo "/stats" | nc -N localhost 8080
+    echo "3. Mirror test: "; echo "Hello World" | nc -N localhost 8080
+    echo "4. Unknown command: "; echo "/unknown" | nc -N localhost 8080

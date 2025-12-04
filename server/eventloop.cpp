@@ -44,15 +44,12 @@ bool EventLoop::remove_fd(int fd) {
 void EventLoop::run(int timeout_ms) {
     epoll_event events[MAX_EVENTS];
     
-    // ОДИН вызов epoll_wait, без внутреннего цикла!
     int num_events = epoll_wait(epoll_fd_, events, MAX_EVENTS, timeout_ms);
     
     if (num_events == -1) {
         if (errno == EINTR) {
-            // Сигнал прервал epoll_wait - просто возвращаемся
             return;
         }
-        // Другая ошибка
         return;
     }
     

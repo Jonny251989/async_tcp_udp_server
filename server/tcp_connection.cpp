@@ -26,7 +26,6 @@ void TcpConnection::close() {
         ::close(fd_);
         fd_ = -1;
         
-        // Уменьшаем счетчик при закрытии соединения
         if (session_manager_) {
             session_manager_->remove_connection();
         }

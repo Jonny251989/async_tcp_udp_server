@@ -6,37 +6,37 @@
 /stats            - Статистика подключений
 /shutdown         - Завершить работу сервера
 
-# I. Запуск локально через разные терминалы:
+1. Запуск локально через разные терминалы:
 
-# 1. Запустите сервер в первом терминале
-./build/async_tcp_udp_server 8080
+    Запустите сервер в первом терминале
+        ./build/async_tcp_udp_server 8080
 
-# 2. В другом терминале запустите TCP клиент
-./build/client_app tcp 127.0.0.1 8080
+    В другом терминале запустите TCP клиент
+        ./build/client_app tcp 127.0.0.1 8080
 
-# 3. Отправьте сообщения:
-#    Введите: Hello World
-#    Ответ: Hello World (echo)
+    c. Отправьте сообщения:
+        Input: Hello World
+        Output: Hello World (echo)
 
-#    Введите: /time
-#    Ответ: 2024-01-15 14:30:25 (время на момент запроса)
+        Input: /time
+        Output: 2024-01-15 14:30:25 (время на момент запроса)
 
-#    Введите: /stats
-#    Ответ: Total connections: 5, Current connections: 2
+        Input: /stats
+        Output: Total connections: 5, Current connections: 2
 
-#    Введите: /shutdown
-#    Ответ: /SHUTDOWN_ACK (сервер завершит работу)
+        Input: /shutdown
+        Output: /SHUTDOWN_ACK (сервер завершит работу)
 
 # II. Запуск тестов для автоматической проверки работы клиент-серверной модели
 
-1. Running unit tests...
-make unit-test
+    Running unit tests...
+        make unit-test
 
-2. Running functional tests...
-make functional-test
+    Running functional tests...
+        make functional-test
 
-# 3. To run systemd tests: sudo make systemd-test
-sudo tests/functional/systemd_test.sh
+    To run systemd tests: sudo make systemd-test
+        sudo tests/functional/systemd_test.sh
 
 
 

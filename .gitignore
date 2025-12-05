@@ -1,4 +1,5 @@
 /build
+/script
 .vscode/
 .server.log
 note.txt

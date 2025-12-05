@@ -5,7 +5,6 @@ TcpConnection::TcpConnection(int fd, const sockaddr_in& client_addr, std::shared
     , client_addr_(client_addr)
     , session_manager_(session_manager) 
 {
-    // Увеличиваем счетчики при создании соединения
     if (session_manager_) {
         session_manager_->add_connection();
     }

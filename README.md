@@ -1,10 +1,19 @@
+# Проект: Асинхронная клиент-серверная модель
+# Основные требования
+        ОС: Linux (Ubuntu 22.04+, Debian 11+, CentOS 8+), Windows/WSL2, macOS
 
+        Компилятор: g++ ≥10.0 (поддержка C++20)
 
-# КОМАНДЫ:
+        Инструменты: make ≥4.0, CMake ≥3.16
 
-    /time             - Получить время сервера
-    /stats            - Статистика подключений
-    /shutdown         - Завершить работу сервера
+        Библиотеки: pthread, systemd, Google Test (для тестов)
+
+# Команды для сборки
+        make all            собрать всё
+        make clean          очистить сборку
+        make test           запустить тесты
+        make docker-build   собрать образ
+        make docker-test    запустить тесты в контейнере
 
 # Запуск локально через разные терминалы:
 
@@ -26,6 +35,12 @@
 
         Input: /shutdown
         Output: /SHUTDOWN_ACK (сервер завершит работу)
+
+# КОМАНДЫ:
+
+    /time             - Получить время сервера
+    /stats            - Статистика подключений
+    /shutdown         - Завершить работу сервера
 
 # II. Запуск тестов для автоматической проверки работы клиент-серверной модели
 
@@ -63,3 +78,11 @@
         echo "2. /stats: "; echo "/stats" | nc -N localhost 8080
         echo "3. Mirror test: "; echo "Hello World" | nc -N localhost 8080
         echo "4. Unknown command: "; echo "/unknown" | nc -N localhost 8080
+
+
+# IV. Запуск клиент-серверной модели c помощью docker-compose
+
+    docker build -t async-test-runner .
+    docker-compose run --rm test
+    docker-compose run --rm systemd-test
+    docker-compose down

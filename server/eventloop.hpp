@@ -26,13 +26,13 @@ public:
     
     void run(int timeout_ms);
     void stop();
-    void stop_immediate();  // Новый метод для немедленной остановки
+    void stop_immediate(); 
 
 private:
     static const int MAX_EVENTS = 64;
     
     int epoll_fd_;
-    int wakeup_fd_[2];  // Pipe для пробуждения
+    int wakeup_fd_[2];
     std::unordered_map<int, EventCallback> callbacks_;
     std::atomic<bool> running_{false};
 };

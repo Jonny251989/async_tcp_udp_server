@@ -7,8 +7,6 @@ void signal_handler(int signal) {
     if (already_called.exchange(true)) {
         return;
     }
-    
-    std::cout << "Received signal " << signal << ", shutting down..." << std::endl;
     global_shutdown_flag.store(true, std::memory_order_release);
 }   
 
@@ -56,29 +54,21 @@ void Server::stop() {
     
     shutdown_requested_ = true;
     
-    // Останавливаем обработчики
     if (tcp_handler_) tcp_handler_->stop();
     if (udp_handler_) udp_handler_->stop();
 }
 
 void Server::run() {
-    // Главный цикл с ЧАСТОЙ проверкой флагов
     while (true) {
-        // Проверяем флаги ПЕРЕД каждым вызовом event_loop
         if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
             break;
         }
-        
-        // Обрабатываем события с очень коротким таймаутом
-        event_loop_.run(1);  // 1ms timeout
-        
-        // Проверяем флаги ПОСЛЕ каждого вызова event_loop
+        event_loop_.run(1); 
+
         if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
             break;
         }
     }
-    
-    // Остановка при выходе из цикла
     stop();
 }
 

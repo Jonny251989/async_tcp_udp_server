@@ -2,3 +2,4 @@
 .vscode/
 .server.log
 note.txt
+.env

@@ -5,7 +5,6 @@
 int main(int argc, char* argv[]) {
     uint16_t port = 0;
     
-    // Получаем порт из переменной окружения или аргументов командной строки
     char* env_port = std::getenv("SERVER_PORT");
     if (env_port != nullptr) {
         try {

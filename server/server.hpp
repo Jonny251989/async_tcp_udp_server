@@ -35,7 +35,6 @@ private:
     void handle_tcp_connection(std::shared_ptr<TcpConnection> connection);
     void handle_tcp_message(const std::string& message, std::shared_ptr<TcpConnection> connection);
     void handle_udp_message(const std::string& message, const sockaddr_in& client_addr);
-     void stop_immediate();  // Добавить эту строку если нужно
 
     uint16_t port_;
     std::unique_ptr<TcpHandler> tcp_handler_;

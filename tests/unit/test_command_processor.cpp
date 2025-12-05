@@ -34,7 +34,7 @@ TEST_F(CommandProcessorTest, ProcessTimeCommand) {
     EXPECT_EQ(result[16], ':');
 }
 
-TEST_F(CommandProcessorTest, ProcessStatsCommand) {)
+TEST_F(CommandProcessorTest, ProcessStatsCommand) {
     session_manager->add_connection();
     
     std::string result = processor->process_command("/stats");

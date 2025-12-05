@@ -85,7 +85,11 @@
 
 # IV. Запуск клиент-серверной модели c помощью docker-compose
 
-    docker build -t async-test-runner .
-    docker-compose run --rm test
-    docker-compose run --rm systemd-test
-    docker-compose down
+        docker-compose down --remove-orphans
+
+        docker build -t async-test-runner .
+
+        docker-compose run --rm test
+        docker-compose run --rm systemd-test
+
+        docker-compose down

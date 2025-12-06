@@ -1,20 +1,16 @@
 #include "server.hpp"
 
-std::atomic<bool> global_shutdown_flag{false};
-
-void signal_handler(int signal) {
-    static std::atomic<bool> already_called{false};
-    if (already_called.exchange(true)) {
-        return;
-    }
-    global_shutdown_flag.store(true, std::memory_order_release);
-}   
+#include <iostream>
+#include <cstdlib>
+#include <memory>
+#include <csignal>
 
 Server::Server(uint16_t port) 
     : port_(port)
     , session_manager_(std::make_shared<SessionManager>())
     , command_processor_(create_commands())
-    , shutdown_requested_(false) {}
+    , shutdown_requested_(false) {
+}
 
 Server::~Server() {
     stop();
@@ -29,11 +25,11 @@ std::vector<std::unique_ptr<Command>> Server::create_commands() {
 }
 
 bool Server::start() {
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
-    std::signal(SIGQUIT, signal_handler);
-
+    // Ignore SIGPIPE (to avoid crashing on broken connections)
     std::signal(SIGPIPE, SIG_IGN);
+    
+    // Setup signal handler first
+    setup_signal_handler();
     
     tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
     udp_handler_ = std::make_unique<UdpHandler>(port_);
@@ -56,20 +52,46 @@ void Server::stop() {
     
     if (tcp_handler_) tcp_handler_->stop();
     if (udp_handler_) udp_handler_->stop();
+    
+    // Reset signal handler when stopping
+    reset_signal_handler();
 }
 
 void Server::run() {
     while (true) {
-        if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
+        if (shutdown_requested_) {
             break;
         }
-        event_loop_.run(1); 
-
-        if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
+        
+        try {
+            event_loop_.run(100); // 100ms timeout to check flags
+        } catch (const std::exception& e) {
+            std::cerr << "Event loop error: " << e.what() << std::endl;
+            break;
+        }
+        
+        if (shutdown_requested_) {
             break;
         }
     }
+    
     stop();
+}
+
+void Server::request_shutdown() {
+    std::cout << "\nShutdown requested via signal..." << std::endl;
+    shutdown_requested_ = true;
+}
+
+void Server::setup_signal_handler() {
+    // Use weak_ptr for safe access from signal handler
+    std::weak_ptr<Server> weak_this = shared_from_this();
+    
+    set_signal_handler({SIGINT, SIGTERM, SIGQUIT}, [weak_this]() {
+        if (auto server = weak_this.lock()) {
+            server->request_shutdown();
+        }
+    });
 }
 
 void Server::setup_tcp_handler() {
@@ -112,7 +134,6 @@ void Server::handle_tcp_message(const std::string& message, std::shared_ptr<TcpC
     if (response == "/SHUTDOWN_ACK") {
         shutdown_requested_ = true;
         connection->send("Server shutting down gracefully...\n");
-        global_shutdown_flag.store(true, std::memory_order_release);
         return;
     }
     
@@ -125,7 +146,6 @@ void Server::handle_udp_message(const std::string& message, const sockaddr_in& c
     if (response == "/SHUTDOWN_ACK") {
         shutdown_requested_ = true;
         udp_handler_->send_message("Server shutting down gracefully...", client_addr);
-        global_shutdown_flag.store(true, std::memory_order_release);
         return;
     }
     

@@ -5,17 +5,20 @@
 
 # ===== КОНФИГУРАЦИЯ =====
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Icommon -Iserver -Iclient
+CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Iserver -Iclient
 LDFLAGS = -pthread
 
 BUILD_DIR = build
 
-# Файлы
+# Файлы сервера
 SERVER_SRCS = server/main.cpp server/server.cpp server/tcp_handler.cpp server/udp_handler.cpp \
               server/tcp_connection.cpp server/command_processor.cpp server/eventloop.cpp \
               server/command.cpp server/session_manager.cpp
 SERVER_OBJS = $(SERVER_SRCS:%.cpp=$(BUILD_DIR)/%.o)
-CLIENT_OBJS = $(BUILD_DIR)/client/main.o
+
+# Файлы клиента
+CLIENT_SRCS = client/main.cpp
+CLIENT_OBJS = $(CLIENT_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
 # ===== СБОРКА =====
 all: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app

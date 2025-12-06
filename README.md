@@ -83,11 +83,17 @@
 
 # IV. Запуск клиент-серверной модели c помощью docker-compose
 
-        docker-compose down --remove-orphans
+# Очистка
+docker-compose down --remove-orphans
 
-        docker build -t async-test-runner .
+# Сборка образа
+docker build -t async-test-runner .
 
-        docker-compose run --rm test
-        docker-compose run --rm systemd-test
+# Запуск unit и functional тестов вместе (сервис 'test')
+docker-compose run --rm test
 
-        docker-compose down
+# Запуск systemd тестов (сервис 'systemd-test')
+docker-compose run --rm systemd-test
+
+# Очистка
+docker-compose down

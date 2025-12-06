@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   test:
-    image: async-test-runner
+    image: jonnyrembo/async-tcp-udp-server:latest
     container_name: async-tests-test
     command: >
       bash -c "
@@ -21,7 +21,7 @@ services:
     network_mode: host
 
   systemd-test:
-    image: async-test-runner
+    image: jonnyrembo/async-tcp-udp-server:latest
     container_name: async-tests-systemd
     command: >
       bash -c "

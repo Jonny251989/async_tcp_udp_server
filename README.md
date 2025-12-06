@@ -60,17 +60,15 @@
 
 # III. Запуск клиент-серверной модели c помощью docker-compose
 
-
         docker-compose down --remove-orphans
-
 
         docker build -t async-test-runner .
 
-
         docker-compose run --rm test
-
 
         docker-compose run --rm systemd-test
 
-
         docker-compose down
+
+
+# Для визуального подтверждения корректности работы системы была подключена CI/CD результаты выполнения можно посмотреть в разделе action

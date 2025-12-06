@@ -18,18 +18,23 @@ jobs:
         run: |
           docker pull jonnyrembo/async-tcp-udp-server:latest
 
-      - name: Run tests sequentially
+      - name: Run unit tests
         run: |
-          # Запускаем unit тесты
-          echo "=== Running unit tests ==="
           docker compose run --rm unit-tests
-          
-          # Запускаем functional тесты
-          echo "=== Running functional tests ==="
+
+      - name: Build project in container
+        run: |
+          docker run --rm \
+            -v $(pwd):/workspace \
+            jonnyrembo/async-tcp-udp-server:latest \
+            bash -c "cd /workspace && make all"
+
+      - name: Run functional tests
+        run: |
           docker compose run --rm functional-tests
-          
-          # Запускаем systemd тесты
-          echo "=== Running systemd tests ==="
+
+      - name: Run systemd tests
+        run: |
           docker compose run --rm systemd-tests
 
       - name: Cleanup

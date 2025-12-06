@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <memory>
 
-// Базовый класс с общими методами
+
 template <typename Derived>
 class ClientBase {
 protected:
@@ -60,7 +60,7 @@ public:
 
     void run() {
         if (!is_interactive()) {
-            // Pipe mode
+            
             std::string message;
             while (std::getline(std::cin, message)) {
                 if (message.empty()) continue;
@@ -75,7 +75,7 @@ public:
                 }
             }
         } else {
-            // Interactive mode
+           
             std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
             
             while (true) {
@@ -123,7 +123,7 @@ private:
     bool is_interactive() const { return isatty(STDIN_FILENO); }
 };
 
-// TCP клиент
+
 class TcpClient : public ClientBase<TcpClient> {
 public:
     static constexpr int PROTOCOL_TYPE = SOCK_STREAM;

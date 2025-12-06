@@ -18,10 +18,6 @@ jobs:
         run: |
           docker pull jonnyrembo/async-tcp-udp-server:latest
 
-      - name: Run unit tests
-        run: |
-          docker compose run --rm unit-tests
-
       - name: Build project in container
         run: |
           docker run --rm \
@@ -29,13 +25,11 @@ jobs:
             jonnyrembo/async-tcp-udp-server:latest \
             bash -c "cd /workspace && make all"
 
-      - name: Run functional tests
+      - name: Run all tests
         run: |
-          docker compose run --rm functional-tests
-
-      - name: Run systemd tests
-        run: |
-          docker compose run --rm systemd-tests
+          # Используем существующий docker-compose.yml с сервисами test и systemd-test
+          docker compose run --rm test
+          docker compose run --rm systemd-test
 
       - name: Cleanup
         if: always()

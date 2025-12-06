@@ -58,42 +58,19 @@
         sudo tests/functional/systemd_test.sh
 
 
-
-# III. Запуск клиент-серверной модели через Docker
-
-
-        docker build -t async-systemd . 
-
-        docker run -d \
-        --name async-test \
-        --privileged \
-        --tmpfs /run \
-        --tmpfs /tmp \
-        -p 8080:8080 \
-        -p 8080:8080/udp \
-        async-systemd-new
-
-        sleep 5
-
-        echo "1. /time: "; echo "/time" | nc -N localhost 8080
-        echo "2. /stats: "; echo "/stats" | nc -N localhost 8080
-        echo "3. Mirror test: "; echo "Hello World" | nc -N localhost 8080
-        echo "4. Unknown command: "; echo "/unknown" | nc -N localhost 8080
+# III. Запуск клиент-серверной модели c помощью docker-compose
 
 
-# IV. Запуск клиент-серверной модели c помощью docker-compose
+        docker-compose down --remove-orphans
 
-# Очистка
-docker-compose down --remove-orphans
 
-# Сборка образа
-docker build -t async-test-runner .
+        docker build -t async-test-runner .
 
-# Запуск unit и functional тестов вместе (сервис 'test')
-docker-compose run --rm test
 
-# Запуск systemd тестов (сервис 'systemd-test')
-docker-compose run --rm systemd-test
+        docker-compose run --rm test
 
-# Очистка
-docker-compose down
+
+        docker-compose run --rm systemd-test
+
+
+        docker-compose down

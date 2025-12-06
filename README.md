@@ -61,10 +61,9 @@
 
 # III. Запуск клиент-серверной модели через Docker
 
-    Cобрать образ:
-        docker build -t async-systemd .
 
-    Запустить контейнер:
+        docker build -t async-systemd . 
+
         docker run -d \
         --name async-test \
         --privileged \
@@ -72,9 +71,8 @@
         --tmpfs /tmp \
         -p 8080:8080 \
         -p 8080:8080/udp \
-        async-systemd
+        async-systemd-new
 
-    Проверить:
         sleep 5
 
         echo "1. /time: "; echo "/time" | nc -N localhost 8080

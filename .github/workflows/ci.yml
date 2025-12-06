@@ -1,0 +1,58 @@
+name: Async TCP/UDP Server CI/CD
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    container:
+      image: docker.io/jonnyrembo/async-tcp-udp-server:latest
+      env:
+        SOURCE_DIR: /workspace
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ${{ github.workspace }}:/workspace 
+      options: --privileged --network host
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build project
+        run: |
+          cd /workspace
+          make all
+
+      - name: Run unit tests
+        run: |
+          cd /workspace
+          make unit-test
+
+      - name: Run functional tests
+        run: |
+          cd /workspace
+          make functional-test
+
+      - name: Start server and test systemd integration
+        run: |
+          echo "=== Starting server with systemd ==="
+          # Запускаем сервер через systemd
+          systemctl start async-server
+          sleep 3
+          
+          echo "=== Testing server connectivity ==="
+          # Тестируем TCP
+          echo "/time" | timeout 2 nc -N localhost 8080 && echo "✅ TCP connection works"
+          
+          # Тестируем UDP
+          echo "/time" | timeout 2 nc -u -w1 localhost 8080 && echo "✅ UDP connection works"
+          
+          # Проверяем статистику
+          echo "/stats" | timeout 2 nc -N localhost 8080
+          
+          echo "=== Stopping server ==="
+          systemctl stop async-server

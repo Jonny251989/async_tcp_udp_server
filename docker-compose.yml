@@ -1,23 +1,28 @@
 version: "3.8"
 
 services:
-  test:
-    image: async-test-runner
-    container_name: async-tests-test
-    command: >
-      bash -c "
-        make unit-test &&
-        echo '---' &&
-        make functional-test
-      "
+  unit-tests:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    container_name: async-unit-tests
+    command: make unit-test
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+
+  functional-tests:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    container_name: async-functional-tests
+    command: make functional-test
     volumes:
       - .:/workspace
     working_dir: /workspace
     network_mode: host
+    depends_on:
+      - unit-tests
 
-  systemd-test:
-    image: async-test-runner
-    container_name: async-tests-systemd
+  systemd-tests:
+    image: jonnyrembo/async-tcp-udp-server:latest
+    container_name: async-systemd-tests
     command: >
       bash -c "
         echo '=== Systemd Test ===' &&
@@ -32,7 +37,10 @@ services:
         /usr/bin/async_tcp_udp_server 8081 &
         SERVER_PID=$$! &&
         sleep 3 &&
-        echo 'STATS' | timeout 2 nc -N localhost 8081 || true &&
+        echo 'Testing TCP...' &&
+        echo '/time' | timeout 2 nc -N localhost 8081 || echo 'TCP test failed' &&
+        echo 'Testing UDP...' &&
+        echo '/time' | timeout 2 nc -u localhost 8081 || echo 'UDP test failed' &&
         echo '/shutdown' | timeout 2 nc -N localhost 8081 || true &&
         wait $$SERVER_PID
       "
@@ -40,3 +48,5 @@ services:
       - .:/workspace
     working_dir: /workspace
     network_mode: host
+    depends_on:
+      - functional-tests

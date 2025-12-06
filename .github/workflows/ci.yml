@@ -14,17 +14,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker
-        uses: docker/setup-buildx-action@v3
-
       - name: Pull Docker image
         run: |
           docker pull jonnyrembo/async-tcp-udp-server:latest
 
-      - name: Run all tests with Docker Compose
+      - name: Run tests sequentially
         run: |
-          docker compose up --abort-on-container-exit
+          # Запускаем unit тесты
+          echo "=== Running unit tests ==="
+          docker compose run --rm unit-tests
+          
+          # Запускаем functional тесты
+          echo "=== Running functional tests ==="
+          docker compose run --rm functional-tests
+          
+          # Запускаем systemd тесты
+          echo "=== Running systemd tests ==="
+          docker compose run --rm systemd-tests
 
       - name: Cleanup
+        if: always()
         run: |
           docker compose down

@@ -17,6 +17,7 @@ RUN apt-get update && \
     libgtest-dev \
     libgmock-dev \
     netcat-openbsd \
+    expect \
     iputils-ping \
     sudo \
     dbus \

@@ -1,24 +1,35 @@
-.PHONY: all clean install uninstall systemd-install systemd-uninstall test unit-test functional-test systemd-test all-tests clean-all \
-        docker-build docker-unit-test docker-functional-test docker-test docker-clean \
-        compose-up compose-down compose-unit-test compose-functional-test compose-all compose-clean compose-systemd-test \
-        service-file check-systemd test-script help
+.PHONY: all clean install uninstall systemd-install systemd-uninstall test unit-test functional-test functional-test-gtest systemd-test all-tests clean-all \
+	docker-build docker-unit-test docker-functional-test docker-test docker-clean \
+	compose-up compose-down compose-unit-test compose-functional-test compose-all compose-clean compose-systemd-test \
+	service-file check-systemd test-script help
 
 # ===== КОНФИГУРАЦИЯ =====
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Iserver -Iclient
+CXXFLAGS = -std=c++20 -Wall -Wextra -pthread -O2 -I. -Iserver -Iclient -Itests
 LDFLAGS = -pthread
 
 BUILD_DIR = build
 
 # Файлы сервера
 SERVER_SRCS = server/main.cpp server/server.cpp server/tcp_handler.cpp server/udp_handler.cpp \
-              server/tcp_connection.cpp server/command_processor.cpp server/eventloop.cpp \
-              server/command.cpp server/session_manager.cpp
+	server/tcp_connection.cpp server/command_processor.cpp server/eventloop.cpp \
+	server/command.cpp server/session_manager.cpp
 SERVER_OBJS = $(SERVER_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
 # Файлы клиента
 CLIENT_SRCS = client/main.cpp
 CLIENT_OBJS = $(CLIENT_SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+# Файлы юнит-тестов
+UNIT_TEST_SRCS = tests/unit/test_main.cpp tests/unit/test_command_processor.cpp tests/unit/test_session_manager.cpp
+UNIT_TEST_OBJS = $(UNIT_TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+# Файлы функциональных тестов (GTest) - удаляем эту переменную, если файла нет
+# FUNCTIONAL_TEST_SRCS = tests/functional/functional_test.cpp
+# FUNCTIONAL_TEST_OBJS = $(FUNCTIONAL_TEST_SRCS:%.cpp=$(BUILD_DIR)/%.o)
+
+# Порт для тестов
+TEST_PORT ?= 8080
 
 # ===== СБОРКА =====
 all: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
@@ -63,23 +74,44 @@ systemd-install: install
 	@systemctl daemon-reload && systemctl enable async-server.service
 
 # ===== ТЕСТЫ =====
+# Юнит-тесты
 unit-test: $(BUILD_DIR)/tests/unit_tests
+	@echo "=== Running Unit Tests ==="
 	@$(BUILD_DIR)/tests/unit_tests
 
-functional-test: $(BUILD_DIR)/async_tcp_udp_server
+$(BUILD_DIR)/tests/unit_tests: $(UNIT_TEST_OBJS) \
+	$(BUILD_DIR)/server/command.o \
+	$(BUILD_DIR)/server/session_manager.o \
+	$(BUILD_DIR)/server/command_processor.o
+	@mkdir -p $(BUILD_DIR)/tests
+	$(CXX) $(CXXFLAGS) $^ -o $@ -lgtest -lgtest_main -lpthread
+
+# Bash скриптовые функциональные тесты (оригинальные)
+functional-test: $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
+	@echo "=== Running Bash Functional Tests (port: 8081) ==="
 	@PORT=8081 bash tests/functional/test_server.sh
 
+# Если у вас есть файл tests/functional/functional_test.cpp, раскомментируйте:
+# GTest функциональные тесты с автоматическим запуском сервера
+# functional-test-gtest: $(BUILD_DIR)/functional_tests_auto
+#	@echo "=== Running GTest Functional Tests with Auto Server (port: $(TEST_PORT)) ==="
+#	@PORT=$(TEST_PORT) $(BUILD_DIR)/functional_tests_auto
+
+# Компиляция автоматических GTest функциональных тестов (если файл существует)
+# $(BUILD_DIR)/functional_tests_auto: tests/functional/functional_test.cpp $(BUILD_DIR)/async_tcp_udp_server $(BUILD_DIR)/client_app
+#	@mkdir -p $(BUILD_DIR)/tests
+#	$(CXX) $(CXXFLAGS) $< -o $@ -lgtest -lgtest_main -lpthread
+
+# Системные тесты
 systemd-test: all
 	@sudo bash tests/functional/systemd_test.sh
 
-test: unit-test functional-test
+# Основная цель тестов - запускает все
+test: unit-test functional-test  # удалил functional-test-gtest из списка
+	@echo "=== All Tests Completed ==="
 
+# Все тесты
 all-tests: test
-
-$(BUILD_DIR)/tests/unit_tests: $(patsubst %.cpp,$(BUILD_DIR)/%.o,tests/unit/test_main.cpp tests/unit/test_command_processor.cpp tests/unit/test_session_manager.cpp) \
-                               $(BUILD_DIR)/server/command.o $(BUILD_DIR)/server/session_manager.o $(BUILD_DIR)/server/command_processor.o
-	@mkdir -p $(BUILD_DIR)/tests
-	$(CXX) $(CXXFLAGS) $^ -lgtest -lgtest_main -lpthread -o $@
 
 clean-all: clean
 

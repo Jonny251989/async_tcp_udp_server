@@ -10,7 +10,6 @@
 #include <stdexcept>
 #include <memory>
 
-
 template <typename Derived>
 class ClientBase {
 protected:
@@ -59,70 +58,43 @@ public:
     }
 
     void run() {
-        if (!is_interactive()) {
-            
+        std::cout << "Client started. Type your messages (type 'quit' or 'exit' to exit):" << std::endl;
+        
+        while (true) {
+            std::cout << "> ";
             std::string message;
-            while (std::getline(std::cin, message)) {
-                if (message.empty()) continue;
-                
-                try {
-                    send_message(message + "\n");
-                    std::string response = receive_response();
-                    std::cout << response << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "Error: " << e.what() << std::endl;
-                    break;
-                }
-            }
-        } else {
-           
-            std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
             
-            while (true) {
-                std::cout << "Enter message: ";
-                std::string message;
-                if (!std::getline(std::cin, message)) {
-                    break;
-                }
+            if (!std::getline(std::cin, message)) {
+                break; // EOF (Ctrl+D) 
+            }
+            
+            if (message.empty()) {
+                continue;
+            }
+            
+            if (message == "quit" || message == "exit") {
+                std::cout << "Exiting client..." << std::endl;
+                break;
+            }
+            
+            try {
+                send_message(message + "\n");
+        
+                std::string response = receive_response();
                 
-                if (message == "quit" || message == "exit") {
-                    std::cout << "Exiting client..." << std::endl;
-                    break;
-                }
+                std::cout << response << std::endl;
                 
-                if (message.empty()) {
-                    std::cout << "Message cannot be empty. Try again." << std::endl;
-                    continue;
-                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
                 
-                try {
-                    send_message(message + "\n");
-                    std::string response = receive_response();
-                    std::cout << "Server response: " << response << std::endl;
-                    
-                    std::cout << "Continue? (y/n): ";
-                    std::string answer;
-                    if (!std::getline(std::cin, answer)) {
-                        break;
-                    }
-                    
-                    if (answer == "n" || answer == "N" || answer == "no") {
-                        std::cout << "Exiting client..." << std::endl;
-                        break;
-                    }
-                    
-                } catch (const std::exception& e) {
-                    std::cerr << "Error: " << e.what() << std::endl;
+                if (std::string(e.what()).find("closed") != std::string::npos ||
+                    std::string(e.what()).find("failed") != std::string::npos) {
                     break;
                 }
             }
         }
     }
-
-private:
-    bool is_interactive() const { return isatty(STDIN_FILENO); }
 };
-
 
 class TcpClient : public ClientBase<TcpClient> {
 public:
@@ -161,7 +133,6 @@ public:
     }
 };
 
-// UDP клиент
 class UdpClient : public ClientBase<UdpClient> {
 public:
     static constexpr int PROTOCOL_TYPE = SOCK_DGRAM;
@@ -194,6 +165,5 @@ public:
     }
 };
 
-// Алиасы для обратной совместимости
 using TcpClientOld = TcpClient;
 using UdpClientOld = UdpClient;

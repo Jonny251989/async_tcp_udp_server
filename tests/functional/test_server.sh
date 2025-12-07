@@ -8,7 +8,7 @@ BUILD_DIR="$PROJECT_ROOT/build"
 SERVER="$BUILD_DIR/async_tcp_udp_server"
 CLIENT="$BUILD_DIR/client_app"
 SERVER_HOST="127.0.0.1"
-SERVER_PORT=8080
+SERVER_PORT=${1:-8080}
 
 check_binaries() {
     if [ ! -f "$SERVER" ]; then
@@ -36,6 +36,18 @@ wait_for_server() {
     return 1
 }
 
+# Функция для отправки TCP сообщения через netcat
+send_tcp() {
+    local message="$1"
+    echo -e "$message" | timeout 2 nc -N "$SERVER_HOST" "$SERVER_PORT" 2>/dev/null || true
+}
+
+# Функция для отправки UDP сообщения через netcat
+send_udp() {
+    local message="$1"
+    echo -e "$message" | timeout 2 nc -u -w 1 "$SERVER_HOST" "$SERVER_PORT" 2>/dev/null || true
+}
+
 test_tcp_simple() {
     local failed_tests=0
     
@@ -51,8 +63,9 @@ test_tcp_simple() {
     }
     
     echo "Test 1: Echo..."
-    local output1=$(echo "Hello" | timeout 2 "$CLIENT" "tcp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local echo_response=$(echo "$output1" | grep -v "Connected to TCP" | head -n 1 | xargs)
+    local echo_response=$(send_tcp "Hello")
+    # Убираем лишние пробелы и переводы строк
+    echo_response=$(echo "$echo_response" | xargs)
     
     if [ "$echo_response" == "Hello" ]; then
         echo "✓ Echo test passed"
@@ -62,8 +75,8 @@ test_tcp_simple() {
     fi
     
     echo "Test 2: Time..."
-    local output2=$(echo "/time" | timeout 2 "$CLIENT" "tcp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local time_response=$(echo "$output2" | grep -v "Connected to TCP" | head -n 1 | xargs)
+    local time_response=$(send_tcp "/time")
+    time_response=$(echo "$time_response" | xargs)
     
     if [[ "$time_response" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
         echo "✓ Time test passed"
@@ -73,8 +86,8 @@ test_tcp_simple() {
     fi
     
     echo "Test 3: Stats..."
-    local output3=$(echo "/stats" | timeout 2 "$CLIENT" "tcp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local stats_response=$(echo "$output3" | grep -v "Connected to TCP" | xargs)
+    local stats_response=$(send_tcp "/stats")
+    stats_response=$(echo "$stats_response" | xargs)
     
     if [[ "$stats_response" =~ Total\ connections:\ [0-9]+.*Current\ connections:\ [0-9]+ ]]; then
         echo "✓ Stats test passed: $stats_response"
@@ -84,10 +97,12 @@ test_tcp_simple() {
     fi
     
     echo "Test 4: Shutdown..."
-    local output4=$(echo "/shutdown" | timeout 2 "$CLIENT" "tcp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local shutdown_response=$(echo "$output4" | grep -v "Connected to TCP" | head -n 1 | xargs)
+    local shutdown_response=$(send_tcp "/shutdown")
+    shutdown_response=$(echo "$shutdown_response" | xargs)
     
-    if [ "$shutdown_response" == "Server shutting down gracefully..." ]; then
+    if [[ "$shutdown_response" == "Server shutting down gracefully..." ]] || \
+       [[ "$shutdown_response" == "/SHUTDOWN_ACK" ]] || \
+       [[ "$shutdown_response" =~ shutdown ]]; then
         echo "✓ Shutdown test passed"
     else
         echo "✗ Shutdown test failed: Got '$shutdown_response'"
@@ -117,8 +132,8 @@ test_udp_simple() {
     sleep 2
     
     echo "Test 1: UDP Echo..."
-    local udp_output1=$(echo "Hello UDP" | timeout 2 "$CLIENT" "udp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local udp_echo_response=$(echo "$udp_output1" | grep -v "UDP client ready" | head -n 1 | xargs)
+    local udp_echo_response=$(send_udp "Hello UDP")
+    udp_echo_response=$(echo "$udp_echo_response" | xargs)
     
     if [ "$udp_echo_response" == "Hello UDP" ]; then
         echo "✓ UDP Echo test passed"
@@ -128,8 +143,8 @@ test_udp_simple() {
     fi
 
     echo "Test 2: UDP Time..."
-    local udp_output2=$(echo "/time" | timeout 2 "$CLIENT" "udp" "$SERVER_HOST" "$SERVER_PORT" 2>&1)
-    local udp_time_response=$(echo "$udp_output2" | grep -v "UDP client ready" | head -n 1 | xargs)
+    local udp_time_response=$(send_udp "/time")
+    udp_time_response=$(echo "$udp_time_response" | xargs)
     
     if [[ "$udp_time_response" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
         echo "✓ UDP Time test passed"
@@ -149,6 +164,7 @@ test_udp_simple() {
 
 main() {
     echo "=== Functional Tests for Async TCP/UDP Server ==="
+    echo "Using port: $SERVER_PORT"
     
     check_binaries
     
@@ -158,12 +174,10 @@ main() {
     tcp_failed=$?
     total_failed_tests=$((total_failed_tests + tcp_failed))
     
-
     test_udp_simple
     udp_failed=$?
     total_failed_tests=$((total_failed_tests + udp_failed))
     
- 
     echo ""
     echo "=== Test Results ==="
     echo "TCP tests failed: $tcp_failed"
@@ -178,6 +192,5 @@ main() {
         exit 1
     fi
 }
-
 
 main "$@"

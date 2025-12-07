@@ -5,40 +5,37 @@
 #include <memory>
 #include <csignal>
 
+
+static std::vector<std::unique_ptr<Command>> create_commands(SessionManager& session_manager) {
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<TimeCommand>());
+    commands.push_back(std::make_unique<StatsCommand>(session_manager));  // нужен session_manager
+    commands.push_back(std::make_unique<ShutdownCommand>());
+    return commands;
+}
+
 Server::Server(uint16_t port) 
     : port_(port)
     , session_manager_(std::make_shared<SessionManager>())
-    , command_processor_(create_commands())
+    , command_processor_(create_commands(*session_manager_))  
     , shutdown_requested_(false) {
+
+    std::signal(SIGPIPE, SIG_IGN);
+    tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
+    udp_handler_ = std::make_unique<UdpHandler>(port_);
 }
 
 Server::~Server() {
     stop();
 }
 
-std::vector<std::unique_ptr<Command>> Server::create_commands() {
-    std::vector<std::unique_ptr<Command>> commands;
-    commands.push_back(std::make_unique<TimeCommand>());
-    commands.push_back(std::make_unique<StatsCommand>(*session_manager_));
-    commands.push_back(std::make_unique<ShutdownCommand>());
-    return commands;
-}
 
 bool Server::start() {
-    // Ignore SIGPIPE (to avoid crashing on broken connections)
-    std::signal(SIGPIPE, SIG_IGN);
-    
-    // Setup signal handler first
     setup_signal_handler();
-    
-    tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
-    udp_handler_ = std::make_unique<UdpHandler>(port_);
-    
     if (!tcp_handler_->start() || !udp_handler_->start()) {
         std::cerr << "Failed to start TCP or UDP handler" << std::endl;
         return false;
     }
-    
     setup_tcp_handler();
     setup_udp_handler();
     
@@ -53,24 +50,15 @@ void Server::stop() {
     if (tcp_handler_) tcp_handler_->stop();
     if (udp_handler_) udp_handler_->stop();
     
-    // Reset signal handler when stopping
     reset_signal_handler();
 }
 
 void Server::run() {
-    while (true) {
-        if (shutdown_requested_) {
-            break;
-        }
-        
+    while (!shutdown_requested_) {
         try {
-            event_loop_.run(100); // 100ms timeout to check flags
+            event_loop_.run(100);
         } catch (const std::exception& e) {
             std::cerr << "Event loop error: " << e.what() << std::endl;
-            break;
-        }
-        
-        if (shutdown_requested_) {
             break;
         }
     }
@@ -84,9 +72,8 @@ void Server::request_shutdown() {
 }
 
 void Server::setup_signal_handler() {
-    // Use weak_ptr for safe access from signal handler
+
     std::weak_ptr<Server> weak_this = shared_from_this();
-    
     set_signal_handler({SIGINT, SIGTERM, SIGQUIT}, [weak_this]() {
         if (auto server = weak_this.lock()) {
             server->request_shutdown();

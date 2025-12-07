@@ -9,10 +9,7 @@ void SessionManager::add_connection() {
 }
 
 void SessionManager::remove_connection() {
-    if (current_connections_ > 0) {
-        current_connections_--;
-    }
-
+    current_connections_--;
 }
 
 void SessionManager::increment_total_connections() {

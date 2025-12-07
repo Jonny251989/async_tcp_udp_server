@@ -21,11 +21,9 @@ public:
     void stop();
     void run();
     
-    // For signal handler
     void request_shutdown();
     
 private:
-    std::vector<std::unique_ptr<Command>> create_commands();
     void setup_signal_handler();
     void setup_tcp_handler();
     void setup_udp_handler();

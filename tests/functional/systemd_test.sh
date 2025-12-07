@@ -78,7 +78,7 @@ else
     exit 1
 fi
 
-echo "6. Testing server commands..."
+echo "6. Testing server commands with netcat..."
 
 echo "   Testing /time (TCP):"
 if echo "/time" | timeout 2 nc -N 127.0.0.1 8080 2>/dev/null; then

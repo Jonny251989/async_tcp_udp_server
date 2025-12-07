@@ -2,6 +2,10 @@
 #include <iostream>
 #include <string>
 
+#include "client.hpp"
+#include <iostream>
+#include <string>
+
 void print_usage() {
     std::cout << "Usage: client <protocol> <server_ip> <port>" << std::endl;
     std::cout << "Arguments:" << std::endl;

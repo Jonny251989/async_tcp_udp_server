@@ -8,132 +8,68 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdexcept>
+#include <memory>
 
-template <int TYPE>
-class Client {
-public:
-    Client(const std::string& server_ip, uint16_t port);
-    ~Client();
-    
-    void run();
-
-private:
-    void setup_socket();
-    void connect_to_server();
-    void send_message(const std::string& message);
-    std::string receive_response();
-    bool is_interactive() const { return isatty(STDIN_FILENO); }
-    
+template <typename Derived>
+class ClientBase {
+protected:
+    int sock_ = -1;
+    sockaddr_in serv_addr_{};
     std::string server_ip_;
     uint16_t port_;
-    int sock_;
-    sockaddr_in serv_addr_;
-};
 
-template <int TYPE>
-Client<TYPE>::Client(const std::string& server_ip, uint16_t port) 
-    : server_ip_(server_ip), port_(port), sock_(-1) {
-    setup_socket();
-    connect_to_server();
-}
+    Derived& derived() { return static_cast<Derived&>(*this); }
+    const Derived& derived() const { return static_cast<const Derived&>(*this); }
 
-template <int TYPE>
-Client<TYPE>::~Client() {
-    if (sock_ != -1) close(sock_);
-}
-
-template <int TYPE>
-void Client<TYPE>::setup_socket() {
-    sock_ = socket(AF_INET, TYPE, 0);
-    if (sock_ < 0) throw std::runtime_error("Socket creation failed");
-    
-    std::memset(&serv_addr_, 0, sizeof(serv_addr_));
-    serv_addr_.sin_family = AF_INET;
-    serv_addr_.sin_port = htons(port_);
-    
-    if (inet_pton(AF_INET, server_ip_.c_str(), &serv_addr_.sin_addr) <= 0) {
-        close(sock_);
-        throw std::runtime_error("Invalid address: " + server_ip_);
+public:
+    ClientBase(const std::string& server_ip, uint16_t port)
+        : server_ip_(server_ip), port_(port) {
     }
-}
 
-template <int TYPE>
-void Client<TYPE>::connect_to_server() {
-    if constexpr (TYPE == SOCK_STREAM) {
-        if (connect(sock_, (sockaddr*)&serv_addr_, sizeof(serv_addr_)) < 0) {
+    virtual ~ClientBase() {
+        if (sock_ != -1) close(sock_);
+    }
+
+    void setup_socket() {
+        sock_ = socket(AF_INET, Derived::PROTOCOL_TYPE, 0);
+        if (sock_ < 0) {
+            throw std::runtime_error("Socket creation failed");
+        }
+
+        std::memset(&serv_addr_, 0, sizeof(serv_addr_));
+        serv_addr_.sin_family = AF_INET;
+        serv_addr_.sin_port = htons(port_);
+
+        if (inet_pton(AF_INET, server_ip_.c_str(), &serv_addr_.sin_addr) <= 0) {
             close(sock_);
-            throw std::runtime_error("Connection failed to " + server_ip_ + ":" + std::to_string(port_));
+            throw std::runtime_error("Invalid address: " + server_ip_);
         }
-        std::cout << "Connected to TCP server " << server_ip_ << ":" << port_ << std::endl;
-    } else {
-        std::cout << "UDP client ready to send to " << server_ip_ << ":" << port_ << std::endl;
     }
-}
 
-template <int TYPE>
-void Client<TYPE>::send_message(const std::string& message) {
-    ssize_t bytes_sent;
-    
-    if constexpr (TYPE == SOCK_STREAM) {
-        bytes_sent = send(sock_, message.c_str(), message.length(), 0);
-    } else {
-        bytes_sent = sendto(sock_, message.c_str(), message.length(), 0,
-                           (sockaddr*)&serv_addr_, sizeof(serv_addr_));
-    }
-    
-    if (bytes_sent < 0) throw std::runtime_error("Send failed");
-}
-
-template <int TYPE>
-std::string Client<TYPE>::receive_response() {
-    char buffer[1024] = {0};
-    ssize_t bytes_read;
-    
-    if constexpr (TYPE == SOCK_STREAM) {
-        bytes_read = recv(sock_, buffer, sizeof(buffer) - 1, 0);
-    } else {
-        sockaddr_in from_addr{};
-        socklen_t addr_len = sizeof(from_addr);
-        bytes_read = recvfrom(sock_, buffer, sizeof(buffer) - 1, 0,
-                            (sockaddr*)&from_addr, &addr_len);
-    }
-    
-    if (bytes_read > 0) {
-        buffer[bytes_read] = '\0';
-        return std::string(buffer);
-    } else if (bytes_read == 0) {
-        throw std::runtime_error("Connection closed by server");
-    } else {
-        throw std::runtime_error("Receive failed");
-    }
-}
-
-template <int TYPE>
-void Client<TYPE>::run() {
-    if (!is_interactive()) {
-        // Pipe mode - читаем из stdin до конца
-        std::string message;
-        while (std::getline(std::cin, message)) {
-            if (message.empty()) continue;
-            
-            try {
-                send_message(message + "\n");
-                std::string response = receive_response();
-                std::cout << response << std::endl;
-            } catch (const std::exception& e) {
-                std::cerr << "Error: " << e.what() << std::endl;
-                break;
-            }
+    void send_message(const std::string& message) {
+        ssize_t bytes_sent = derived().send_impl(message);
+        if (bytes_sent < 0) {
+            throw std::runtime_error("Send failed");
         }
-    } else {
-        // Interactive mode
-        std::cout << "Client started. Type your messages (type 'quit' to exit):" << std::endl;
+    }
+
+    std::string receive_response() {
+        return derived().receive_impl();
+    }
+
+    void run() {
+        std::cout << "Client started. Type your messages (type 'quit' or 'exit' to exit):" << std::endl;
         
         while (true) {
-            std::cout << "Enter message: ";
+            std::cout << "> ";
             std::string message;
+            
             if (!std::getline(std::cin, message)) {
-                break; // EOF или ошибка ввода
+                break; // EOF (Ctrl+D) 
+            }
+            
+            if (message.empty()) {
+                continue;
             }
             
             if (message == "quit" || message == "exit") {
@@ -141,34 +77,93 @@ void Client<TYPE>::run() {
                 break;
             }
             
-            if (message.empty()) {
-                std::cout << "Message cannot be empty. Try again." << std::endl;
-                continue;
-            }
-            
             try {
                 send_message(message + "\n");
+        
                 std::string response = receive_response();
-                std::cout << "Server response: " << response << std::endl;
                 
-                std::cout << "Continue? (y/n): ";
-                std::string answer;
-                if (!std::getline(std::cin, answer)) {
-                    break;
-                }
-                
-                if (answer == "n" || answer == "N" || answer == "no") {
-                    std::cout << "Exiting client..." << std::endl;
-                    break;
-                }
+                std::cout << response << std::endl;
                 
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;
-                break;
+                
+                if (std::string(e.what()).find("closed") != std::string::npos ||
+                    std::string(e.what()).find("failed") != std::string::npos) {
+                    break;
+                }
             }
         }
     }
-}
+};
 
-using TcpClient = Client<SOCK_STREAM>;
-using UdpClient = Client<SOCK_DGRAM>;
+class TcpClient : public ClientBase<TcpClient> {
+public:
+    static constexpr int PROTOCOL_TYPE = SOCK_STREAM;
+
+    TcpClient(const std::string& server_ip, uint16_t port)
+        : ClientBase(server_ip, port) {
+        setup_socket();
+        connect_to_server();
+    }
+
+    void connect_to_server() {
+        if (connect(sock_, reinterpret_cast<sockaddr*>(&serv_addr_), sizeof(serv_addr_)) < 0) {
+            close(sock_);
+            throw std::runtime_error("Connection failed to " + server_ip_ + ":" + std::to_string(port_));
+        }
+        std::cout << "Connected to TCP server " << server_ip_ << ":" << port_ << std::endl;
+    }
+
+    ssize_t send_impl(const std::string& message) {
+        return send(sock_, message.c_str(), message.length(), 0);
+    }
+
+    std::string receive_impl() {
+        char buffer[1024] = {0};
+        ssize_t bytes_read = recv(sock_, buffer, sizeof(buffer) - 1, 0);
+        
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            return std::string(buffer);
+        } else if (bytes_read == 0) {
+            throw std::runtime_error("Connection closed by server");
+        } else {
+            throw std::runtime_error("Receive failed");
+        }
+    }
+};
+
+class UdpClient : public ClientBase<UdpClient> {
+public:
+    static constexpr int PROTOCOL_TYPE = SOCK_DGRAM;
+
+    UdpClient(const std::string& server_ip, uint16_t port)
+        : ClientBase(server_ip, port) {
+        setup_socket();
+        std::cout << "UDP client ready to send to " << server_ip_ << ":" << port_ << std::endl;
+    }
+
+    ssize_t send_impl(const std::string& message) {
+        return sendto(sock_, message.c_str(), message.length(), 0,
+                     reinterpret_cast<sockaddr*>(&serv_addr_), sizeof(serv_addr_));
+    }
+
+    std::string receive_impl() {
+        char buffer[1024] = {0};
+        sockaddr_in from_addr{};
+        socklen_t addr_len = sizeof(from_addr);
+        
+        ssize_t bytes_read = recvfrom(sock_, buffer, sizeof(buffer) - 1, 0,
+                                    reinterpret_cast<sockaddr*>(&from_addr), &addr_len);
+        
+        if (bytes_read > 0) {
+            buffer[bytes_read] = '\0';
+            return std::string(buffer);
+        } else {
+            throw std::runtime_error("Receive failed");
+        }
+    }
+};
+
+using TcpClientOld = TcpClient;
+using UdpClientOld = UdpClient;

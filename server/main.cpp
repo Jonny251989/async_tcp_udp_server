@@ -1,6 +1,7 @@
 #include "server.hpp"
 #include <iostream>
 #include <cstdlib>
+#include <memory>
 
 int main(int argc, char* argv[]) {
     uint16_t port = 0;
@@ -29,17 +30,18 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        Server server(port);
+        // Create server through shared_ptr for safe signal handling
+        auto server = std::make_shared<Server>(port);
         
-        if (!server.start()) {
+        if (!server->start()) {
             std::cerr << "Failed to start server" << std::endl;
             return 1;
         }
         
         std::cout << "Server running on port " << port << std::endl;
-        std::cout << "Press Ctrl+C to exit..." << std::endl;
+        std::cout << "Press Ctrl+C or send /shutdown to exit..." << std::endl;
         
-        server.run();
+        server->run();
         
         std::cout << "Server stopped gracefully" << std::endl;
     } catch (const std::exception& e) {

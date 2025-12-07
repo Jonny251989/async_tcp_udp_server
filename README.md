@@ -15,7 +15,7 @@
         make docker-build   собрать образ
         make docker-test    запустить тесты в контейнере
 
-# dev пакет
+# deb пакет
         async-tcp-udp-server_1.0.0_amd64.deb
 
 # Запуск локально через разные терминалы:
@@ -59,16 +59,20 @@
 
 
 # III. Запуск клиент-серверной модели c помощью docker-compose
-
+    - Очистка 
         docker-compose down --remove-orphans
 
+    - Cборка образ для компиляции 
+        docker compose build builder
+
+    - Сборка образа тестового раннера 
         docker build -t async-test-runner .
 
+    - Запуск unit и functional тестов вместе (сервис 'test') 
         docker-compose run --rm test
 
+    - Запуск systemd тестов (сервис 'systemd-test')
         docker-compose run --rm systemd-test
 
+    - Очистка 
         docker-compose down
-
-
-# Для визуального подтверждения корректности работы системы была подключена CI/CD результаты выполнения можно посмотреть в разделе action

@@ -1,48 +1,41 @@
 #include "server.hpp"
 
-std::atomic<bool> global_shutdown_flag{false};
+#include <iostream>
+#include <cstdlib>
+#include <memory>
+#include <csignal>
 
-void signal_handler(int signal) {
-    static std::atomic<bool> already_called{false};
-    if (already_called.exchange(true)) {
-        return;
-    }
-    global_shutdown_flag.store(true, std::memory_order_release);
-}   
+
+static std::vector<std::unique_ptr<Command>> create_commands(SessionManager& session_manager) {
+    std::vector<std::unique_ptr<Command>> commands;
+    commands.push_back(std::make_unique<TimeCommand>());
+    commands.push_back(std::make_unique<StatsCommand>(session_manager));  // нужен session_manager
+    commands.push_back(std::make_unique<ShutdownCommand>());
+    return commands;
+}
 
 Server::Server(uint16_t port) 
     : port_(port)
     , session_manager_(std::make_shared<SessionManager>())
-    , command_processor_(create_commands())
-    , shutdown_requested_(false) {}
+    , command_processor_(create_commands(*session_manager_))  
+    , shutdown_requested_(false) {
+
+    std::signal(SIGPIPE, SIG_IGN);
+    tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
+    udp_handler_ = std::make_unique<UdpHandler>(port_);
+}
 
 Server::~Server() {
     stop();
 }
 
-std::vector<std::unique_ptr<Command>> Server::create_commands() {
-    std::vector<std::unique_ptr<Command>> commands;
-    commands.push_back(std::make_unique<TimeCommand>());
-    commands.push_back(std::make_unique<StatsCommand>(*session_manager_));
-    commands.push_back(std::make_unique<ShutdownCommand>());
-    return commands;
-}
 
 bool Server::start() {
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
-    std::signal(SIGQUIT, signal_handler);
-
-    std::signal(SIGPIPE, SIG_IGN);
-    
-    tcp_handler_ = std::make_unique<TcpHandler>(port_, session_manager_);
-    udp_handler_ = std::make_unique<UdpHandler>(port_);
-    
+    setup_signal_handler();
     if (!tcp_handler_->start() || !udp_handler_->start()) {
         std::cerr << "Failed to start TCP or UDP handler" << std::endl;
         return false;
     }
-    
     setup_tcp_handler();
     setup_udp_handler();
     
@@ -56,20 +49,36 @@ void Server::stop() {
     
     if (tcp_handler_) tcp_handler_->stop();
     if (udp_handler_) udp_handler_->stop();
+    
+    reset_signal_handler();
 }
 
 void Server::run() {
-    while (true) {
-        if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
-            break;
-        }
-        event_loop_.run(1); 
-
-        if (shutdown_requested_ || global_shutdown_flag.load(std::memory_order_acquire)) {
+    while (!shutdown_requested_) {
+        try {
+            event_loop_.run(100);
+        } catch (const std::exception& e) {
+            std::cerr << "Event loop error: " << e.what() << std::endl;
             break;
         }
     }
+    
     stop();
+}
+
+void Server::request_shutdown() {
+    std::cout << "\nShutdown requested via signal..." << std::endl;
+    shutdown_requested_ = true;
+}
+
+void Server::setup_signal_handler() {
+
+    std::weak_ptr<Server> weak_this = shared_from_this();
+    set_signal_handler({SIGINT, SIGTERM, SIGQUIT}, [weak_this]() {
+        if (auto server = weak_this.lock()) {
+            server->request_shutdown();
+        }
+    });
 }
 
 void Server::setup_tcp_handler() {
@@ -112,7 +121,6 @@ void Server::handle_tcp_message(const std::string& message, std::shared_ptr<TcpC
     if (response == "/SHUTDOWN_ACK") {
         shutdown_requested_ = true;
         connection->send("Server shutting down gracefully...\n");
-        global_shutdown_flag.store(true, std::memory_order_release);
         return;
     }
     
@@ -125,7 +133,6 @@ void Server::handle_udp_message(const std::string& message, const sockaddr_in& c
     if (response == "/SHUTDOWN_ACK") {
         shutdown_requested_ = true;
         udp_handler_->send_message("Server shutting down gracefully...", client_addr);
-        global_shutdown_flag.store(true, std::memory_order_release);
         return;
     }
     

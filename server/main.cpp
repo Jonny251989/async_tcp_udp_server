@@ -30,7 +30,6 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // Create server through shared_ptr for safe signal handling
         auto server = std::make_shared<Server>(port);
         
         if (!server->start()) {

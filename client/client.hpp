@@ -26,7 +26,7 @@ public:
         : server_ip_(server_ip), port_(port) {
     }
 
-    virtual ~ClientBase() {
+    ~ClientBase() {
         if (sock_ != -1) close(sock_);
     }
 
@@ -164,6 +164,3 @@ public:
         }
     }
 };
-
-using TcpClientOld = TcpClient;
-using UdpClientOld = UdpClient;
